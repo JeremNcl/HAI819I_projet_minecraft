@@ -1,0 +1,32 @@
+# Dossiers de build (CMake)
+build/
+bin/
+out/
+
+# Fichiers objets et exécutables compilés
+*.o
+*.out
+*.exe
+*.app
+VoxelEngine
+
+# Fichiers générés par CMake (en cas d'erreur à la racine)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Fichiers générés par les IDE et éditeurs (VSCode, CLion, Vim, etc.)
+.vscode/
+.idea/
+*.suo
+*.user
+*.swp
+*~
+
+# Fichiers de cache système
+.DS_Store
+Thumbs.db
+
+# Roadmap
+.Roadmap_v3.md
