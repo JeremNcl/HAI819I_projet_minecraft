@@ -45,6 +45,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+// Debug flags
+bool debugWireframe = false;
+
 /*******************************************************************************/
 
 int main( void ) {
@@ -170,7 +173,16 @@ int main( void ) {
 
         // Update ECS Systems
         meshingSystem.update(registry);
+        
+        // Apply debug wireframe mode
+        if (debugWireframe) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+        
         renderSystem.update(registry, basicProgramID, viewMatrix, projMatrix);
+        
+        // Restore normal fill mode BEFORE ImGui
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         // === ImGui Debug UI ===
         ImGuiIO& io = ImGui::GetIO();
@@ -229,6 +241,15 @@ int main( void ) {
 void processInput(GLFWwindow *window, Camera& camera) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+    
+    // Toggle wireframe with G key
+    static bool g_pressed_last = false;
+    bool g_pressed = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
+    if (g_pressed && !g_pressed_last) {
+        debugWireframe = !debugWireframe;
+        printf("[DEBUG] Wireframe mode: %s\n", debugWireframe ? "ON" : "OFF");
+    }
+    g_pressed_last = g_pressed;
     
     // Fullscreen toggle with F11 (requires GLFW 3.2+, we have 3.1, so simplified)
     static bool f11_pressed_last = false;
