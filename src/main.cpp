@@ -18,12 +18,22 @@ GLFWwindow* window;
 
 using namespace glm;
 
-// Inclusions de notre moteur (Nouvelle architecture)
+// ImGui
+#include "imgui.h"
+#include "imgui_impl_opengl3.h"
+
+// Inclusions de notre moteur (Nouvelle architecture ECS)
 #include "engine/render/shader.hpp"
 #include "engine/io/textureLoader.hpp"
 #include "engine/scene/camera.hpp"
-#include "engine/scene/sceneGraph.hpp"
-#include "engine/scene/meshNode.hpp"
+
+// ECS Includes
+#include "ecs/registry.hpp"
+#include "ecs/components/transform.hpp"
+#include "ecs/components/mesh.hpp"
+#include "ecs/components/chunk.hpp"
+#include "ecs/systems/chunkMeshingSystem.hpp"
+#include "ecs/systems/renderSystem.hpp"
 
 void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -80,7 +90,8 @@ int main( void ) {
     glDepthFunc(GL_LESS);
 
     // Activation du Culling (Indispensable pour les Voxels)
-    glEnable(GL_CULL_FACE);
+    // Modification temporaire : désactivé pour debugger les faces visibles
+    glDisable(GL_CULL_FACE);
 
     GLuint VertexArrayID;
     glGenVertexArrays(1, &VertexArrayID);
@@ -89,20 +100,62 @@ int main( void ) {
     // Chargement du shader générique
     GLuint basicProgramID = LoadShaders("assets/shaders/vertex_shader.glsl", "assets/shaders/fragment_shader.glsl");
     glUseProgram(basicProgramID);
-    GLuint MVP_ID = glGetUniformLocation(basicProgramID, "MVP");
-
-    // Chargement d'une texture de test
-    GLuint blockTexture = loadBMP_custom("assets/textures/grass.bmp");
     
-    // === INITIALISATION DU MONDE ===
+    // === INITIALISATION ImGui ===
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = "build/imgui.ini";
+    ImGui::StyleColorsDark();
+    ImGui_ImplOpenGL3_Init("#version 150");
     
-    SceneGraph sceneGraph;
+    // === INITIALISATION DU MONDE ECS ===
     
-    // TODO: Instancier ici le premier ChunkNode et l'ajouter au sceneGraph
-    // auto chunkNode = std::make_shared<ChunkNode>(...);
-    // sceneGraph.getRoot()->addChild(chunkNode);
-
-    printf("Graphe de scène initialisé. Prêt pour l'ajout des Chunks.\n");
+    printf("=== PREMIER TEST : AFFICHAGE D'UN CHUNK ===\n");
+    printf("Initialisation de la Registry ECS...\n");
+    
+    // Créer la Registry ECS
+    Registry registry;
+    
+    // Créer 1 chunk de test
+    EntityID testChunkEntity = registry.createEntity();
+    printf("Chunk créé (EntityID: %u)\n", testChunkEntity);
+    
+    // Remplir le chunk avec des données voxel (terrain manuel pour démo)
+    ChunkComponent chunkData(glm::ivec3(0, 0, 0));
+    printf("Génération du terrain manuel (16×256×16 voxels)...\n");
+    
+    // Remplissage manuel : couche pierre en bas, puis dirt, puis herbe
+    for (int x = 0; x < 16; ++x) {
+        for (int z = 0; z < 16; ++z) {
+            for (int y = 0; y < 256; ++y) {
+                if (y < 5) {
+                    chunkData.setVoxel(x, y, z, VoxelType::STONE);
+                } else if (y < 10) {
+                    chunkData.setVoxel(x, y, z, VoxelType::DIRT);
+                } else if (y == 10) {
+                    chunkData.setVoxel(x, y, z, VoxelType::GRASS);
+                } else {
+                    chunkData.setVoxel(x, y, z, VoxelType::AIR);
+                }
+            }
+        }
+    }
+    printf("  → %u voxels créés (STONE: 0-5, DIRT: 5-10, GRASS: 10)\n", VOXEL_ARRAY_SIZE);
+    chunkData.meshDirty = true;  // Marquer pour remaillage
+    
+    registry.addComponent(testChunkEntity, chunkData);
+    registry.addComponent(testChunkEntity, MeshComponent());
+    registry.addComponent(testChunkEntity, TransformComponent(glm::vec3(0.0f, 0.0f, 0.0f)));
+    
+    // Créer les systèmes
+    ChunkMeshingSystem meshingSystem;
+    RenderSystem renderSystem;
+    
+    printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem).\n");
+    printf("Caméra initialisée en mode FREE_CAMERA.\n");
+    printf("Contrôles: WASD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation\n");
+    printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     // Initialisation de la caméra (Mode Libre par défaut)
     Camera camera;
@@ -130,11 +183,46 @@ int main( void ) {
         camera.update(window, deltaTime);
         
         // Calcul ViewProjection
-        glm::mat4 viewProjection = camera.getProjectionMatrix() * camera.getViewMatrix();
+        glm::mat4 viewMatrix = camera.getViewMatrix();
+        glm::mat4 projMatrix = camera.getProjectionMatrix();
 
-        // Update & Draw de la scène
-        sceneGraph.update(deltaTime);
-        sceneGraph.draw(viewProjection);
+        // Update ECS Systems
+        meshingSystem.update(registry);
+        renderSystem.update(registry, basicProgramID, viewMatrix, projMatrix);
+
+        // === ImGui Debug UI ===
+        ImGuiIO& io = ImGui::GetIO();
+        int displayW, displayH;
+        glfwGetWindowSize(window, &displayW, &displayH);
+        io.DisplaySize = ImVec2((float)displayW, (float)displayH);
+        
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(350, 200), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Debug Info")) {
+            ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "=== Camera Debug ===");
+            
+            glm::vec3 camPos = camera.getPosition();
+            ImGui::Text("Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
+            
+            glm::vec3 camFront = camera.getFront();
+            ImGui::Text("Direction: (%.2f, %.2f, %.2f)", camFront.x, camFront.y, camFront.z);
+            
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "=== Performance ===");
+            ImGui::Text("FPS: %.1f", 1.0f / deltaTime);
+            ImGui::Text("DeltaTime: %.4f ms", deltaTime * 1000.0f);
+        }
+        ImGui::End();
+
+        ImGui::Render();
+        
+        // Disable depth test for ImGui rendering (it's 2D overlay)
+        glDisable(GL_DEPTH_TEST);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glEnable(GL_DEPTH_TEST);
 
         // Swap buffers
         glfwSwapBuffers(window);
@@ -143,8 +231,11 @@ int main( void ) {
     } // Check if the ESC key was pressed or the window was closed
     while( (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) && (glfwWindowShouldClose(window) == 0) );
 
+    // Cleanup ImGui
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui::DestroyContext();
+
     // Cleanup
-    MeshNode::clearMeshCache();
     glDeleteProgram(basicProgramID);
     glDeleteVertexArrays(1, &VertexArrayID);
 
@@ -156,8 +247,14 @@ int main( void ) {
 void processInput(GLFWwindow *window, Camera& camera) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-
-    // On peut retirer le toggle de caméra isométrique car inutile en vue Voxel FPS.
+    
+    // Fullscreen toggle with F11 (requires GLFW 3.2+, we have 3.1, so simplified)
+    static bool f11_pressed_last = false;
+    bool f11_pressed = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
+    if (f11_pressed && !f11_pressed_last) {
+        printf("[DEBUG] F11 pressed - fullscreen toggle not fully supported in GLFW 3.1\n");
+    }
+    f11_pressed_last = f11_pressed;
 }
 
 // Resize callback

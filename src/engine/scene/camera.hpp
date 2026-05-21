@@ -21,6 +21,20 @@ public:
     glm::mat4 getViewMatrix() const { return viewMatrix; }
     glm::mat4 getProjectionMatrix() const { return projectionMatrix; }
     
+    // Getters pour la position et direction (pour debug)
+    glm::vec3 getPosition() const { return freePosition; }
+    glm::vec3 getFront() const {
+        float horizontalAngleCos = cos(freeHorizontalAngle);
+        float horizontalAngleSin = sin(freeHorizontalAngle);
+        float verticalAngleCos = cos(freeVerticalAngle);
+        float verticalAngleSin = sin(freeVerticalAngle);
+        return glm::normalize(glm::vec3(
+            horizontalAngleSin * verticalAngleCos,
+            -verticalAngleSin,
+            -horizontalAngleCos * verticalAngleCos
+        ));
+    }
+    
     // Gestion des modes
     void setMode(CameraMode mode, GLFWwindow* window);
     CameraMode getMode() const { return currentMode; }
