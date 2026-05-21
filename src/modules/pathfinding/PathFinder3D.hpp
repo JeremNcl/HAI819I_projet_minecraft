@@ -5,6 +5,11 @@
 #include <cmath>
 #include <glm/glm.hpp>
 #include "../terrain_gen/TerrainGenerator.hpp"
+#include "../../ecs/registry.hpp"
+#include "../../ecs/components/chunk.hpp"
+#include "../../ecs/components/mesh.hpp"
+
+
 
 struct GLMVec3Hash {
     std::size_t operator()(const glm::ivec3& k) const {
@@ -28,11 +33,11 @@ struct PathNode {
 
 class PathFinder3D {
 public:
-    std::vector<glm::ivec3> FindPath(glm::ivec3 startPos, glm::ivec3 targetPos, const std::vector<BlockType>& chunkData);
+    std::vector<glm::ivec3> FindPath(glm::ivec3 startPos, glm::ivec3 targetPos, Registry& registry);
     
 private:
     int GetDistance(glm::ivec3 a, glm::ivec3 b) const;
-    std::vector<glm::ivec3> GetValidNeighbors(glm::ivec3 currentPos, const std::vector<BlockType>& chunkData);
-    bool IsBlockSolid(glm::ivec3 pos, const std::vector<BlockType>& chunkData) const;
+    std::vector<glm::ivec3> GetValidNeighbors(glm::ivec3 currentPos, Registry& registry);
+    bool IsBlockSolid(glm::ivec3 pos, Registry& registry) const;
     std::vector<glm::ivec3> RetracePath(std::unordered_map<glm::ivec3, glm::ivec3, GLMVec3Hash>& parentMap, glm::ivec3 start, glm::ivec3 end);
 };

@@ -6,7 +6,7 @@ int PathFinder3D::GetDistance(glm::ivec3 a, glm::ivec3 b) const {
     return std::abs(a.x - b.x) + std::abs(a.y - b.y) + std::abs(a.z - b.z);
 }
 
-std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 targetPos, const std::vector<BlockType>& chunkData) {
+std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 targetPos, Registry& registry) {
     std::priority_queue<PathNode, std::vector<PathNode>, std::greater<PathNode>> openSet;
     std::unordered_map<glm::ivec3, int, GLMVec3Hash> gCostMap;
     std::unordered_map<glm::ivec3, glm::ivec3, GLMVec3Hash> parentMap;
@@ -29,7 +29,7 @@ std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 t
 
         if (currentNode.gCost > gCostMap[currentNode.pos]) continue;
 
-        for (glm::ivec3 neighborPos : GetValidNeighbors(currentNode.pos, chunkData)) {
+        for (glm::ivec3 neighborPos : GetValidNeighbors(currentNode.pos, registry)) {
             int newMovementCostToNeighbor = currentNode.gCost + 1;
 
             if (gCostMap.find(neighborPos) == gCostMap.end() || newMovementCostToNeighbor < gCostMap[neighborPos]) {
@@ -55,7 +55,7 @@ std::vector<glm::ivec3> PathFinder3D::RetracePath(std::unordered_map<glm::ivec3,
     return path;
 }
 
-std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, const std::vector<BlockType>& chunkData) {
+std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, Registry& registry) {
     std::vector<glm::ivec3> neighbors;
     glm::ivec3 directions[6] = {
         glm::ivec3( 1,  0,  0), glm::ivec3(-1,  0,  0),
@@ -66,25 +66,30 @@ std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, c
     for (int i = 0; i < 6; ++i) {
         glm::ivec3 neighborPos = currentPos + directions[i];
         
-        if (!IsBlockSolid(neighborPos, chunkData)) {
+        if (!IsBlockSolid(neighborPos, registry)) {
             neighbors.push_back(neighborPos);
         }
     }
     return neighbors;
 }
 
-bool PathFinder3D::IsBlockSolid(glm::ivec3 pos, const std::vector<BlockType>& chunkData) const {
-    if (pos.x < 0 || pos.x >= TerrainGenerator::CHUNK_WIDTH ||
-        pos.y < 0 || pos.y >= TerrainGenerator::CHUNK_HEIGHT ||
-        pos.z < 0 || pos.z >= TerrainGenerator::CHUNK_DEPTH) {
-        return true; 
-    }
-    int index = pos.x + (pos.z * TerrainGenerator::CHUNK_WIDTH) + (pos.y * TerrainGenerator::CHUNK_DEPTH * TerrainGenerator::CHUNK_WIDTH);
-    BlockType block = chunkData[index];
+bool PathFinder3D::IsBlockSolid(glm::ivec3 pos, Registry& registry) const {
+    auto view = registry.view<ChunkComponent, MeshComponent>();
+    
+    for (EntityID entity : view) {
+        const auto& chunk = registry.getComponent<ChunkComponent>(entity);
+        
+        int minX = chunk.chunkPosition.x * 16;
+        int minZ = chunk.chunkPosition.z * 16;
 
-    if (block == BlockType::AIR) {
-        return false;
+        if (pos.x >= minX && pos.x < minX + 16 &&
+            pos.z >= minZ && pos.z < minZ + 16 &&
+            pos.y >= 0 && pos.y < 256) {
+            
+            VoxelType type = chunk.getVoxel(pos.x - minX, pos.y, pos.z - minZ);
+            return type != VoxelType::AIR;
+        }
     }
     
-    return true;
+    return true; 
 }

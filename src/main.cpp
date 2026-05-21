@@ -37,6 +37,8 @@ using namespace glm;
 #include "ecs/components/chunk.hpp"
 #include "ecs/systems/chunkMeshingSystem.hpp"
 #include "ecs/systems/renderSystem.hpp"
+#include "ecs/systems/PathFindingSystem.hpp"
+#include "ecs/systems/TerrainSystem.hpp"
 
 void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -125,17 +127,25 @@ int main( void ) {
     // === SELECT TEST SCENE ===
     // 0 = SimpleChunk (pour tester winding order + culling)
     // 1 = TerrainGenerator (pour tester la génération procédural)
-    #define ACTIVE_SCENE 0
+    // 2 = DynamicTerrain (pour tester TerrainSystem + PathFindingSystem)
+    #define ACTIVE_SCENE 2
     
     if (ACTIVE_SCENE == 0) {
         TestScenes::createSimpleChunk(registry);
-    } else {
+    } else if (ACTIVE_SCENE == 1) {
         TestScenes::createTerrainChunk(registry);
+    } else if (ACTIVE_SCENE == 2) {
+        TestScenes::createDynamicTerrainScene(registry);
     }
     
     // Créer les systèmes
     ChunkMeshingSystem meshingSystem;
     RenderSystem renderSystem;
+    
+    // Systèmes du dev bonus
+    TerrainConfig config = LoadConfig("config.txt");
+    TerrainSystem terrainSystem(config);
+    PathFindingSystem pathFindingSystem;
     
     printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem).\n");
     printf("Caméra initialisée en mode FREE_CAMERA.\n");
@@ -173,6 +183,10 @@ int main( void ) {
 
         // Update ECS Systems
         meshingSystem.update(registry);
+        
+        // Bonus dev systems (terrain generation + pathfinding)
+        terrainSystem.update(registry);
+        pathFindingSystem.update(registry);
         
         // Apply debug wireframe mode
         if (debugWireframe) {

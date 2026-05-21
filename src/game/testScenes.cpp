@@ -99,4 +99,14 @@ void createTerrainChunk(Registry& registry) {
     printf("✓ Generated %d procedural terrain chunks\n", chunksGenerated);
 }
 
+void createDynamicTerrainScene(Registry& registry) {
+    printf("=== TEST SCENE: Dynamic Terrain (TerrainSystem + PathFinding) ===\n");
+    printf("This scene will use TerrainSystem for dynamic chunk generation\n");
+    printf("and PathFindingSystem for AI pathfinding across multiple chunks.\n");
+    printf("Note: Chunks will be generated on-demand by TerrainSystem\n");
+    
+    // Empty scene - chunks will be generated dynamically by TerrainSystem
+    // during the ECS update loop
+}
+
 }  // namespace TestScenes
