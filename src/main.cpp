@@ -28,6 +28,7 @@ using namespace glm;
 #include "engine/scene/camera.hpp"
 #include "modules/terrain_gen/TerrainGenerator.hpp"
 #include "modules/pathfinding/PathFinder3D.hpp"
+#include "game/testScenes.hpp"
 
 // ECS Includes
 #include "ecs/registry.hpp"
@@ -91,9 +92,9 @@ int main( void ) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    // Activation du Culling (Indispensable pour les Voxels)
-    // Modification temporaire : désactivé pour debugger les faces visibles
-    glDisable(GL_CULL_FACE);
+    // Enable face culling for performance (CCW winding order)
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 
     GLuint VertexArrayID;
     glGenVertexArrays(1, &VertexArrayID);
@@ -113,77 +114,21 @@ int main( void ) {
     
     // === INITIALISATION DU MONDE ECS ===
     
-    printf("=== PREMIER TEST : AFFICHAGE D'UN CHUNK ===\n");
+    printf("=== ECS Monde Initialization ===\n");
     printf("Initialisation de la Registry ECS...\n");
     
-    // Créer la Registry ECS
     Registry registry;
     
-    // Créer 1 chunk de test
-    EntityID testChunkEntity = registry.createEntity();
-    printf("Chunk créé (EntityID: %u)\n", testChunkEntity);
+    // === SELECT TEST SCENE ===
+    // 0 = SimpleChunk (pour tester winding order + culling)
+    // 1 = TerrainGenerator (pour tester la génération procédural)
+    #define ACTIVE_SCENE 0
     
-    // Remplir le chunk avec des données voxel (terrain manuel pour démo)
-    ChunkComponent chunkData(glm::ivec3(0, 0, 0));
-    printf("Génération du terrain manuel (16×256×16 voxels)...\n");
-    
-    printf("Génération du terrain procédural (10x10 Chunks)...\n");
-    
-    TerrainConfig config = LoadConfig("config.txt");
-    TerrainGenerator generator(config);
-
-    int numChunksX = 2;
-    int numChunksZ = 2;
-    int chunksGenerated = 0;
-
-    for (int chunkX = 0; chunkX < numChunksX; ++chunkX) {
-        for (int chunkZ = 0; chunkZ < numChunksZ; ++chunkZ) {
-        
-            EntityID currentChunkEntity = registry.createEntity();
-            ChunkComponent chunkData(glm::ivec3(chunkX, 0, chunkZ));
-            std::vector<BlockType> proceduralBlocks = generator.GenerateChunk(chunkX, chunkZ);
-            for (int y = 0; y < TerrainGenerator::CHUNK_HEIGHT; ++y) {
-                for (int z = 0; z < TerrainGenerator::CHUNK_DEPTH; ++z) {
-                    for (int x = 0; x < TerrainGenerator::CHUNK_WIDTH; ++x) {
-                        
-                        int index = generator.GetIndex(x, y, z);
-                        BlockType myBlock = proceduralBlocks[index];
-                        VoxelType theirType = VoxelType::AIR;
-                        
-                        switch (myBlock) {
-                            case BlockType::GRASS:   theirType = VoxelType::GRASS; break;
-                            case BlockType::DIRT:    theirType = VoxelType::DIRT; break;
-                            case BlockType::STONE:   theirType = VoxelType::STONE; break;
-                            // case BlockType::WOOD:    theirType = VoxelType::WOOD; break;
-                            // case BlockType::LEAVES:  theirType = VoxelType::LEAVES; break;
-                            // case BlockType::COAL:    theirType = VoxelType::COAL; break;
-                            // case BlockType::BEDROCK: theirType = VoxelType::BEDROCK; break;
-                        }
-
-                        chunkData.setVoxel(x, y, z, theirType);
-                    }
-                }
-            }
-
-            chunkData.meshDirty = true;
-            
-            registry.addComponent(currentChunkEntity, chunkData);
-            registry.addComponent(currentChunkEntity, MeshComponent());
-            
-            float worldPosX = chunkX * TerrainGenerator::CHUNK_WIDTH;
-            float worldPosZ = chunkZ * TerrainGenerator::CHUNK_DEPTH;
-            registry.addComponent(currentChunkEntity, TransformComponent(glm::vec3(worldPosX, 0.0f, worldPosZ)));
-
-            chunksGenerated++;
-        }
+    if (ACTIVE_SCENE == 0) {
+        TestScenes::createSimpleChunk(registry);
+    } else {
+        TestScenes::createTerrainChunk(registry);
     }
-    printf("  → %d chunks générés et injectés avec succès !\n", chunksGenerated);
-
-    chunkData.meshDirty = true;  // Marquer pour remaillage
-    
-    registry.addComponent(testChunkEntity, chunkData);
-    registry.addComponent(testChunkEntity, MeshComponent());
-    registry.addComponent(testChunkEntity, TransformComponent(glm::vec3(0.0f, 0.0f, 0.0f)));
     
     // Créer les systèmes
     ChunkMeshingSystem meshingSystem;

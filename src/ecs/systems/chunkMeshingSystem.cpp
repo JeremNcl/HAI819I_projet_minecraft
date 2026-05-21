@@ -69,8 +69,8 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                 if (!isVoxelSolid(voxelData, x + 1, y, z)) {
                     addFace(vertices, indices,
                             voxelPos + glm::vec3(1, 0, 0),
-                            glm::vec3(0, 0, 1),
                             glm::vec3(0, 1, 0),
+                            glm::vec3(0, 0, 1),
                             glm::vec3(1, 0, 0),
                             voxelColor);
                 }
@@ -89,8 +89,8 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                 if (!isVoxelSolid(voxelData, x, y + 1, z)) {
                     addFace(vertices, indices,
                             voxelPos + glm::vec3(0, 1, 0),
-                            glm::vec3(1, 0, 0),
                             glm::vec3(0, 0, 1),
+                            glm::vec3(1, 0, 0),
                             glm::vec3(0, 1, 0),
                             voxelColor);
                 }
@@ -99,8 +99,8 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                 if (!isVoxelSolid(voxelData, x, y - 1, z)) {
                     addFace(vertices, indices,
                             voxelPos + glm::vec3(0, 0, 0),
-                            glm::vec3(0, 0, 1),
                             glm::vec3(1, 0, 0),
+                            glm::vec3(0, 0, 1),
                             glm::vec3(0, -1, 0),
                             voxelColor);
                 }
@@ -119,8 +119,8 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                 if (!isVoxelSolid(voxelData, x, y, z - 1)) {
                     addFace(vertices, indices,
                             voxelPos + glm::vec3(0, 0, 0),
-                            glm::vec3(1, 0, 0),
                             glm::vec3(0, 1, 0),
+                            glm::vec3(1, 0, 0),
                             glm::vec3(0, 0, -1),
                             voxelColor);
                 }
