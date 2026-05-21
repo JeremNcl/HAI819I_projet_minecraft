@@ -9,9 +9,7 @@ class RenderSystem {
 public:
     RenderSystem() = default;
 
-    void update(Registry& registry, GLuint shaderProgram, 
-                const glm::mat4& viewMatrix, 
-                const glm::mat4& projectionMatrix);
+    void update(Registry& registry, GLuint shaderProgram);
 
 private:
     void renderMesh(GLuint shaderProgram,

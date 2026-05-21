@@ -1,4 +1,5 @@
 #include "renderSystem.hpp"
+#include "../components/camera.hpp"
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -24,10 +25,23 @@ void RenderSystem::renderMesh(GLuint shaderProgram,
     glBindVertexArray(0);
 }
 
-void RenderSystem::update(Registry& registry, GLuint shaderProgram,
-                         const glm::mat4& viewMatrix,
-                         const glm::mat4& projectionMatrix) {
+void RenderSystem::update(Registry& registry, GLuint shaderProgram) {
     auto view = registry.view<MeshComponent, TransformComponent>();
+    
+    Registry::View cameraView = registry.view<CameraComponent>();
+
+    if (cameraView.isEmpty()) return; // Aucune camera
+    
+    //TODO : Peut etre passer la cam courrante (active) en singleton pour eviter la boucle à chaque fois (STATIC)
+    CameraComponent* camera = nullptr;
+
+    for (EntityID cameraEntity : cameraView) {
+        CameraComponent& testedCamera = registry.getComponent<CameraComponent>(cameraEntity);
+        if (testedCamera.isActive){
+            camera = &testedCamera;
+            break;
+        }
+    }
 
     for (EntityID entity : view) {
         const auto& mesh = registry.getComponent<MeshComponent>(entity);
@@ -37,7 +51,7 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram,
         modelMatrix = glm::translate(modelMatrix, transform.position);
         modelMatrix = glm::scale(modelMatrix, transform.scale);
 
-        renderMesh(shaderProgram, mesh, modelMatrix, viewMatrix, projectionMatrix);
+        renderMesh(shaderProgram, mesh, modelMatrix, camera->viewMatrix, camera->projectionMatrix);
     }
 
     glUseProgram(0);

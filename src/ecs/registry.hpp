@@ -223,4 +223,32 @@ public:
     View2<T1, T2> view() {
         return View2<T1, T2>(getStorageConst<T1>(), getStorageConst<T2>());
     }
+
+    template <typename T>
+    class View {
+        private:
+            const SparseSet<T>* set;
+
+        public:
+            View(const SparseSet<T>* _set) : set(_set) {}
+
+            using Iterator = std::vector<EntityID>::const_iterator;
+
+            Iterator begin() const {
+                return set ? set->getDense().begin() : std::vector<EntityID>{}.end();
+            }
+
+            Iterator end() const {
+                return set ? set->getDense().end() : std::vector<EntityID>{}.end();
+            }
+
+            bool isEmpty() const {
+                return begin() == end();
+            }
+    };
+
+    template <typename T>
+    View<T> view() {
+        return View<T>(getStorageConst<T>());
+    } 
 };

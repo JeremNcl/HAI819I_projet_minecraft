@@ -17,7 +17,7 @@ include(MSVCMultipleProcessCompile)
 
 # Dossiers d'inclusion
 include_directories(
-	external/glfw-3.1.2/include/
+	external/glfw-3.2/include/
 	external/glm-0.9.7.1/
 	external/glew-1.13.0/include/
 	external/imgui-1.91.0/
