@@ -26,8 +26,8 @@ using namespace glm;
 #include "engine/render/shader.hpp"
 #include "engine/io/textureLoader.hpp"
 #include "engine/scene/camera.hpp"
-#include "engine/world/TerrainGenerator.hpp"
-#include "engine/ia/PathFinder3D.hpp"
+#include "modules/terrain_gen/TerrainGenerator.hpp"
+#include "modules/pathfinding/PathFinder3D.hpp"
 
 // ECS Includes
 #include "ecs/registry.hpp"

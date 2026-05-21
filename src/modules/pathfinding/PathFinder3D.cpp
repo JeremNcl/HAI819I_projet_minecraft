@@ -2,15 +2,9 @@
 #include <algorithm>
 #include <iostream>
 
-//======================================================================================================================
-//======================================================================================================================
-
 int PathFinder3D::GetDistance(glm::ivec3 a, glm::ivec3 b) const {
     return std::abs(a.x - b.x) + std::abs(a.y - b.y) + std::abs(a.z - b.z);
 }
-
-//======================================================================================================================
-//======================================================================================================================
 
 std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 targetPos, const std::vector<BlockType>& chunkData) {
     std::priority_queue<PathNode, std::vector<PathNode>, std::greater<PathNode>> openSet;
@@ -36,7 +30,6 @@ std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 t
         if (currentNode.gCost > gCostMap[currentNode.pos]) continue;
 
         for (glm::ivec3 neighborPos : GetValidNeighbors(currentNode.pos, chunkData)) {
-            
             int newMovementCostToNeighbor = currentNode.gCost + 1;
 
             if (gCostMap.find(neighborPos) == gCostMap.end() || newMovementCostToNeighbor < gCostMap[neighborPos]) {
@@ -51,9 +44,6 @@ std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 t
     return std::vector<glm::ivec3>(); 
 }
 
-//======================================================================================================================
-//======================================================================================================================
-
 std::vector<glm::ivec3> PathFinder3D::RetracePath(std::unordered_map<glm::ivec3, glm::ivec3, GLMVec3Hash>& parentMap, glm::ivec3 start, glm::ivec3 end) {
     std::vector<glm::ivec3> path;
     glm::ivec3 current = end;
@@ -64,9 +54,6 @@ std::vector<glm::ivec3> PathFinder3D::RetracePath(std::unordered_map<glm::ivec3,
     std::reverse(path.begin(), path.end()); 
     return path;
 }
-
-//======================================================================================================================
-//======================================================================================================================
 
 std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, const std::vector<BlockType>& chunkData) {
     std::vector<glm::ivec3> neighbors;
@@ -85,9 +72,6 @@ std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, c
     }
     return neighbors;
 }
-
-//======================================================================================================================
-//======================================================================================================================
 
 bool PathFinder3D::IsBlockSolid(glm::ivec3 pos, const std::vector<BlockType>& chunkData) const {
     if (pos.x < 0 || pos.x >= TerrainGenerator::CHUNK_WIDTH ||
