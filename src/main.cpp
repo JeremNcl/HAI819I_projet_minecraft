@@ -26,6 +26,8 @@ using namespace glm;
 #include "engine/render/shader.hpp"
 #include "engine/io/textureLoader.hpp"
 #include "engine/scene/camera.hpp"
+#include "engine/world/TerrainGenerator.hpp"
+#include "engine/ia/PathFinder3D.hpp"
 
 // ECS Includes
 #include "ecs/registry.hpp"
@@ -125,23 +127,58 @@ int main( void ) {
     ChunkComponent chunkData(glm::ivec3(0, 0, 0));
     printf("Génération du terrain manuel (16×256×16 voxels)...\n");
     
-    // Remplissage manuel : couche pierre en bas, puis dirt, puis herbe
-    for (int x = 0; x < 16; ++x) {
-        for (int z = 0; z < 16; ++z) {
-            for (int y = 0; y < 256; ++y) {
-                if (y < 5) {
-                    chunkData.setVoxel(x, y, z, VoxelType::STONE);
-                } else if (y < 10) {
-                    chunkData.setVoxel(x, y, z, VoxelType::DIRT);
-                } else if (y == 10) {
-                    chunkData.setVoxel(x, y, z, VoxelType::GRASS);
-                } else {
-                    chunkData.setVoxel(x, y, z, VoxelType::AIR);
+    printf("Génération du terrain procédural (10x10 Chunks)...\n");
+    
+    TerrainConfig config = LoadConfig("config.txt");
+    TerrainGenerator generator(config);
+
+    int numChunksX = 2;
+    int numChunksZ = 2;
+    int chunksGenerated = 0;
+
+    for (int chunkX = 0; chunkX < numChunksX; ++chunkX) {
+        for (int chunkZ = 0; chunkZ < numChunksZ; ++chunkZ) {
+        
+            EntityID currentChunkEntity = registry.createEntity();
+            ChunkComponent chunkData(glm::ivec3(chunkX, 0, chunkZ));
+            std::vector<BlockType> proceduralBlocks = generator.GenerateChunk(chunkX, chunkZ);
+            for (int y = 0; y < TerrainGenerator::CHUNK_HEIGHT; ++y) {
+                for (int z = 0; z < TerrainGenerator::CHUNK_DEPTH; ++z) {
+                    for (int x = 0; x < TerrainGenerator::CHUNK_WIDTH; ++x) {
+                        
+                        int index = generator.GetIndex(x, y, z);
+                        BlockType myBlock = proceduralBlocks[index];
+                        VoxelType theirType = VoxelType::AIR;
+                        
+                        switch (myBlock) {
+                            case BlockType::GRASS:   theirType = VoxelType::GRASS; break;
+                            case BlockType::DIRT:    theirType = VoxelType::DIRT; break;
+                            case BlockType::STONE:   theirType = VoxelType::STONE; break;
+                            // case BlockType::WOOD:    theirType = VoxelType::WOOD; break;
+                            // case BlockType::LEAVES:  theirType = VoxelType::LEAVES; break;
+                            // case BlockType::COAL:    theirType = VoxelType::COAL; break;
+                            // case BlockType::BEDROCK: theirType = VoxelType::BEDROCK; break;
+                        }
+
+                        chunkData.setVoxel(x, y, z, theirType);
+                    }
                 }
             }
+
+            chunkData.meshDirty = true;
+            
+            registry.addComponent(currentChunkEntity, chunkData);
+            registry.addComponent(currentChunkEntity, MeshComponent());
+            
+            float worldPosX = chunkX * TerrainGenerator::CHUNK_WIDTH;
+            float worldPosZ = chunkZ * TerrainGenerator::CHUNK_DEPTH;
+            registry.addComponent(currentChunkEntity, TransformComponent(glm::vec3(worldPosX, 0.0f, worldPosZ)));
+
+            chunksGenerated++;
         }
     }
-    printf("  → %u voxels créés (STONE: 0-5, DIRT: 5-10, GRASS: 10)\n", VOXEL_ARRAY_SIZE);
+    printf("  → %d chunks générés et injectés avec succès !\n", chunksGenerated);
+
     chunkData.meshDirty = true;  // Marquer pour remaillage
     
     registry.addComponent(testChunkEntity, chunkData);
