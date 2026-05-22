@@ -19,7 +19,7 @@ public:
         auto view = registry.view<TransformComponent, MeshComponent>();
 
         for (EntityID entity : view) {
-            if (!registry.hasComponent<ChunkComponent>(entity)) {
+            if (!registry.hasComponent<ChunkComponent>(entity) && !registry.hasComponent<SubChunkComponent>(entity)) {
                 
                 const auto& transform = registry.getComponent<TransformComponent>(entity);
                 int chunkX = static_cast<int>(transform.position.x / 16);
@@ -38,27 +38,39 @@ public:
             std::pair<int, int> coords = {result.x, result.z};
             
             if (pendingRequests.find(coords) != pendingRequests.end()) {
-                EntityID entity = pendingRequests[coords];
-                ChunkComponent newChunk(glm::ivec3(result.x, 0, result.z));
+                EntityID parentEntity = pendingRequests[coords];
+                ChunkComponent chunkManager(glm::ivec2(result.x, result.z));
                 
-                for (int y = 0; y < 256; ++y) {
-                    for (int z = 0; z < 16; ++z) {
-                        for (int x = 0; x < 16; ++x) {
-                            int idx = x + (z * 16) + (y * 16 * 16); 
-                            
-                            VoxelType t = VoxelType::AIR;
-                            if (result.data[idx] == BlockType::STONE) t = VoxelType::STONE;
-                            else if (result.data[idx] == BlockType::DIRT) t = VoxelType::DIRT;
-                            else if (result.data[idx] == BlockType::GRASS) t = VoxelType::GRASS;
-                            
-                            newChunk.setVoxel(x, y, z, t);
+                for (int subY = 0; subY < 16; ++subY){
+                    EntityID subChunkEntity = registry.createEntity();
+                    SubChunkComponent subChunk(glm::ivec3(result.x, subY, result.z));
+
+                    for (int y = 0; y < 16; ++y) {
+                        for (int z = 0; z < 16; ++z) {
+                            for (int x = 0; x < 16; ++x) {
+                                int localIdx = x + (z * 16) + (y * 16 * 16); 
+                                
+                                BlockType genBlock = result.data[subY][localIdx];
+
+                                VoxelType t = VoxelType::AIR;
+                                if (genBlock == BlockType::STONE) t = VoxelType::STONE;
+                                else if (genBlock == BlockType::DIRT) t = VoxelType::DIRT;
+                                else if (genBlock == BlockType::GRASS) t = VoxelType::GRASS;
+                                
+                                subChunk.setVoxel(x, y, z, t);
+                            }
                         }
                     }
+                    subChunk.meshDirty = true;
+                    registry.addComponent(subChunkEntity, subChunk);
+                    registry.addComponent(subChunkEntity, MeshComponent());
+                    registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f,0.0f,0.0f)));
+                    chunkManager.subChunks[subY] = subChunkEntity;
                 }
-                
-                newChunk.meshDirty = true;
-                registry.addComponent(entity, newChunk);
-                
+
+                chunkManager.isFullyGenerated = true;
+                registry.addComponent(parentEntity, chunkManager);
+                pendingRequests.erase(coords);
                 pendingRequests.erase(coords);
             }
         }

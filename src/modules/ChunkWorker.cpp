@@ -45,7 +45,7 @@ void ChunkWorker::processTasks() {
             continue;
         }
 
-        std::vector<BlockType> data = m_generator.GenerateChunk(task.first, task.second);
+        std::array<std::vector<BlockType>,16> data = m_generator.GenerateChunk(task.first, task.second);
         
         std::lock_guard<std::mutex> lock(resultsMutex);
         results.push_back({task.first, task.second, std::move(data), true});

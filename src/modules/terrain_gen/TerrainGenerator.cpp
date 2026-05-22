@@ -1,10 +1,11 @@
 #include "TerrainGenerator.hpp"
-#include "../../external/FastNoiseLite.h"
+#include "../../../external/FastNoiseLite.h"
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#include <array>
 
 TerrainConfig LoadConfig(const std::string& filename) {
     TerrainConfig config;
@@ -51,7 +52,7 @@ int TerrainGenerator::GetIndex(int x, int y, int z) const {
     return x + (z * CHUNK_WIDTH) + (y * CHUNK_DEPTH * CHUNK_WIDTH);
 }
 
-std::vector<BlockType> TerrainGenerator::GenerateChunk(int chunkX, int chunkZ) {
+std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX, int chunkZ) {
     std::vector<BlockType> blocks(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH, BlockType::AIR);
 
     FastNoiseLite terrainNoise;
@@ -147,7 +148,26 @@ std::vector<BlockType> TerrainGenerator::GenerateChunk(int chunkX, int chunkZ) {
         }
     }
 
-    return blocks;
+    std::array<std::vector<BlockType>, 16> subChunks;
+
+    for (int i = 0; i<16; ++i) {
+        subChunks[i].resize(CHUNK_WIDTH * 16 * CHUNK_DEPTH);
+    }
+    for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+        int subY = y / 16;
+        int localY = y % 16;
+
+        for (int z = 0; z < CHUNK_DEPTH; ++z) {
+            for (int x = 0; x < CHUNK_WIDTH; ++x) {
+                int flatIndex = GetIndex(x,y,z);
+                int subIndex = x + (z * CHUNK_WIDTH) + (localY * CHUNK_WIDTH * CHUNK_DEPTH);
+
+                subChunks[subY][subIndex] = blocks[flatIndex];
+            }
+        }
+    }
+
+    return subChunks;
 }
 
 void TerrainGenerator::GenerateTree(int startX, int startY, int startZ, std::vector<BlockType>& blocks) const {

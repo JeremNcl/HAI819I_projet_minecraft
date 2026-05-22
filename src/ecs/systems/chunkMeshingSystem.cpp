@@ -1,9 +1,31 @@
 #include "chunkMeshingSystem.hpp"
 #include <algorithm>
 
-bool ChunkMeshingSystem::isVoxelSolid(const ChunkComponent& voxelData, int x, int y, int z) const {
-    VoxelType type = voxelData.getVoxel(x, y, z);
-    return type != VoxelType::AIR;
+VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const SubChunkCache& cache) const {
+    if (x >= 0 && x < 16 && y >= 0 && y < 16 && z >= 0 && z < 16) {
+        return voxelData.getVoxel(x, y, z);
+    }
+
+    glm::ivec3 neighborPos = voxelData.subChunkPosition;
+    int localX = x;
+    int localY = y;
+    int localZ = z;
+
+    if (x < 0) { neighborPos.x -= 1; localX = 15; }
+    else if (x >= 16) { neighborPos.x += 1; localX = 0; }
+
+    if (y < 0) { neighborPos.y -= 1; localY = 15; }
+    else if (y >= 16) { neighborPos.y += 1; localY = 0; }
+
+    if (z < 0) { neighborPos.z -= 1; localZ = 15; }
+    else if (z >= 16) { neighborPos.z += 1; localZ = 0; }
+
+    auto it = cache.find(neighborPos);
+    if (it != cache.end()) {
+        return it->second->getVoxel(localX, localY, localZ);
+    }
+
+    return VoxelType::AIR;
 }
 
 static float getTextureIndex(VoxelType type, int axis, bool isPositive) {
@@ -18,6 +40,7 @@ static float getTextureIndex(VoxelType type, int axis, bool isPositive) {
     }
 }
 
+
 void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
                                   std::vector<GLuint>& indices,
                                   glm::vec3 corner,
@@ -25,7 +48,8 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
                                   glm::vec3 edge2,
                                   glm::vec3 normal,
                                   float texIndex,
-                                  int axis) {
+                                  int axis,
+                                  glm::vec3 worldOffset) {
     GLuint baseIdx = static_cast<GLuint>(vertices.size());
 
     auto getUV = [axis](glm::vec3 pos) -> glm::vec2 {
@@ -34,10 +58,10 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
         return glm::vec2(pos.x, pos.y);
     };
 
-    glm::vec3 p0 = corner;
-    glm::vec3 p1 = corner + edge1;
-    glm::vec3 p2 = corner + edge1 + edge2;
-    glm::vec3 p3 = corner + edge2;
+    glm::vec3 p0 = corner + worldOffset;
+    glm::vec3 p1 = corner + edge1 + worldOffset;
+    glm::vec3 p2 = corner + edge1 + edge2 + worldOffset;
+    glm::vec3 p3 = corner + edge2 + worldOffset;
 
     vertices.push_back({p0, normal, glm::vec3(getUV(p0), texIndex)});
     vertices.push_back({p1, normal, glm::vec3(getUV(p1), texIndex)});
@@ -56,12 +80,19 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
 }
 
 void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
-                                      ChunkComponent& voxelData,
-                                      MeshComponent& mesh) {
+                                      SubChunkComponent& voxelData,
+                                      MeshComponent& mesh,
+                                      const SubChunkCache& cache) {
     std::vector<Vertex> vertices;
     std::vector<GLuint> indices;
 
-    int dims[3] = {CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z};
+    int dims[3] = {SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z};
+
+    glm::vec3 worldOffset(
+        voxelData.subChunkPosition.x * 16.0f,
+        voxelData.subChunkPosition.y * 16.0f,
+        voxelData.subChunkPosition.z * 16.0f
+    );
 
     for (int axis = 0; axis < 3; ++axis) {
         int u = (axis + 1) % 3;
@@ -88,7 +119,7 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                             int ny = x[1] + (isPositive ? q[1] : -q[1]);
                             int nz = x[2] + (isPositive ? q[2] : -q[2]);
 
-                            VoxelType neighbor = voxelData.getVoxel(nx, ny, nz);
+                            VoxelType neighbor = getVoxelGlobal(voxelData, nx, ny, nz, cache);
                             if (neighbor == VoxelType::AIR) {
                                 mask[x[u] + x[v] * dims[u]] = current;
                             } else {
@@ -138,9 +169,9 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
 
                             glm::vec3 calculatedNormal = glm::normalize(glm::cross(edge1, edge2));
                             if (glm::dot(calculatedNormal, normal) < 0) {
-                                addFace(vertices, indices, corner, edge2, edge1, normal, texIndex, axis);
+                                addFace(vertices, indices, corner, edge2, edge1, normal, texIndex, axis, worldOffset);
                             } else {
-                                addFace(vertices, indices, corner, edge1, edge2, normal, texIndex, axis);
+                                addFace(vertices, indices, corner, edge1, edge2, normal, texIndex, axis, worldOffset);
                             }
 
                             for (int l = 0; l < h; ++l) {
@@ -189,14 +220,20 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
 }
 
 void ChunkMeshingSystem::update(Registry& registry) {
-    auto view = registry.view<ChunkComponent, MeshComponent>();
+    auto view = registry.view<SubChunkComponent, MeshComponent>();
+
+    SubChunkCache cache;
+    for (EntityID entity : view) {
+        const auto& subChunk = registry.getComponent<SubChunkComponent>(entity);
+        cache[subChunk.subChunkPosition] = &subChunk;
+    }
 
     for (EntityID entity : view) {
-        auto& voxelData = registry.getComponent<ChunkComponent>(entity);
+        auto& voxelData = registry.getComponent<SubChunkComponent>(entity);
 
         if (voxelData.meshDirty) {
             auto& mesh = registry.getComponent<MeshComponent>(entity);
-            generateMesh(registry, entity, voxelData, mesh);
+            generateMesh(registry, entity, voxelData, mesh, cache);
             voxelData.meshDirty = false;
         }
     }
