@@ -1,0 +1,8 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "lapis_block",
+    "metalness_emissive_roughness": "roughness125_mer",
+    "normal": "quartz_block_top_normal"
+  }
+}
