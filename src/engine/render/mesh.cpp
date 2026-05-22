@@ -1,5 +1,4 @@
 #include "mesh.hpp"
-#include "../io/objectLoader.hpp"
 
 #include <cmath>
 #include <iostream>

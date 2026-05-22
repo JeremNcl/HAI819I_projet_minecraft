@@ -1,11 +1,47 @@
 #include "textureLoader.hpp"
-
+#include "stb_image.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+
+
+
+GLuint loadTextureArray(const std::vector<std::string>& filepaths) {
+    if(filepaths.empty()) return 0;
+
+	GLuint textureID;
+	glGenTextures(1, &textureID);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
+
+	int width = 16, height = 16;
+	int layoutCount = filepaths.size();
+
+	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, width, height, layoutCount,0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	stbi_set_flip_vertically_on_load(true);
+
+	for (int i = 0; i < layoutCount; ++i){
+		int w, h, channels;
+		unsigned char* data = stbi_load(filepaths[i].c_str(),&w, &h ,&channels, 4);
+		if (data){
+			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0,0,0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+			stbi_image_free(data);
+		} else {
+            std::cerr << "ERREUR : Impossible de charger la texture : " << filepaths[i] << std::endl;
+        }
+	}
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+    return textureID;
+}
+
 
 
 GLuint loadBMP_custom(const char * imagepath){

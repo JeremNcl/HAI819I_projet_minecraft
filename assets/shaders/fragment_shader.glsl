@@ -1,21 +1,13 @@
 #version 330 core
 
 // Input data
-in vec2 vUV;
+in vec3 vTexCoords;
 
-// Ouput data
-out vec3 color;
+// Output data
+out vec4 color;
 
-// Uniforms
-uniform bool hasTexture;
-uniform sampler2D textureSampler;
-
+uniform sampler2DArray textureSampler;
 
 void main(){
-    if (hasTexture) {
-        vec3 tex = texture(textureSampler, vUV).rgb;
-        color = tex;
-    } else {
-        color = vec3(0.2, 0.4, 0.8);
-    }
+    color = texture(textureSampler, vTexCoords);
 }
