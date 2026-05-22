@@ -1,6 +1,4 @@
 #include "windowSystem.hpp"
-#include "../../ecs/components/inputReceiver.hpp"
-#include "../../ecs/components/camera.hpp"
 
 void WindowSystem::update(Registry& _registry, GLFWwindow* _window){
 
