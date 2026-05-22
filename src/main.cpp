@@ -207,7 +207,6 @@ int main( void ) {
         windowSystem.update(registry, window);        
         terrainSystem.update(registry);
         pathFindingSystem.update(registry);
-        meshingSystem.update(registry);
         renderSystem.update(registry, basicProgramID);
         
         // Apply debug wireframe mode

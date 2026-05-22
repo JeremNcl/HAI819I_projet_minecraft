@@ -28,17 +28,19 @@ void WindowSystem::update(Registry& _registry, GLFWwindow* _window){
         }
     }
 
+    static int lastWidth = 0;
+    static int lastHeight = 0;
+
     int width, height;
     glfwGetFramebufferSize(_window, &width, &height);
     
+    if (width != lastWidth || height != lastHeight) {
     float newAspectRatio = (height > 0) ? (float)width / (float)height : 1.f;
-
-    Registry::View<CameraComponent> cameraView = _registry.view<CameraComponent>();
+    auto cameraView = _registry.view<CameraComponent>();
     for (EntityID entity : cameraView) {
-        CameraComponent& camera = _registry.getComponent<CameraComponent>(entity);
-
-        if (camera.aspectRatio != newAspectRatio) {
-            camera.aspectRatio = newAspectRatio;
-        }
+        _registry.getComponent<CameraComponent>(entity).aspectRatio = newAspectRatio;
     }
+    lastWidth = width;
+    lastHeight = height;
+}
 }
