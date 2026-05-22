@@ -14,10 +14,7 @@ static float getTextureIndex(VoxelType type, int axis, bool isPositive) {
         case VoxelType::GRASS:
             if (axis == 1 && isPositive) return 2.0f; // Haut (Herbe)
             if (axis == 1 && !isPositive) return 1.0f; // Bas (Terre)
-            // Pour les côtés de l'herbe, on met de la terre pour l'instant (1)
-            // car on n'a pas mis de texture de transition herbe/terre dans l'array.
-            // Si on mettait l'herbe (2), les côtés seraient tout verts !
-            return 2.0f; 
+            return 3.0f; // Côtés (Herbe côté)
         default: return 0.0f;
     }
 }

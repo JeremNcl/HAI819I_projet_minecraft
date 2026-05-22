@@ -10,24 +10,27 @@ void BlockTextureManager::initialize() {
 
     // 1. Liste ordonnée des chemins pour l'Albedo
     std::vector<std::string> colorPaths = {
-        "assets/textures/blocks/stone.png",            // STONE (0)
-        "assets/textures/blocks/dirt.png",             // DIRT (1)
-        "assets/textures/blocks/concrete_green.png"    // GRASS (2) (Temporaire)
+        "assets/textures/blocks/stone.tga",       // Index 0
+        "assets/textures/blocks/dirt.tga",        // Index 1
+        "assets/textures/blocks/grass_top.tga",   // Index 2
+        "assets/textures/blocks/grass_side.tga"   // Index 3
     };
 
     // 2. Liste ordonnée des chemins pour les Normales
     std::vector<std::string> normalPaths = {
-        "assets/textures/blocks/stone_normal.png",     // STONE (0)
-        "assets/textures/blocks/dirt_normal.png",      // DIRT (1)
-        "assets/textures/blocks/all_concrete_powder_normal.png" // GRASS (2) (Temporaire)
+        "assets/textures/blocks/stone_normal.tga",     // Index 0
+        "assets/textures/blocks/dirt_normal.tga",      // Index 1
+        "assets/textures/blocks/grass_top_normal.tga", // Index 2
+        "assets/textures/blocks/grass_side_normal.tga" // Index 3
     };
 
     // 3. Liste ordonnée des chemins pour le Metallic/Roughness (MER)
-    // R = Metallic, G = Roughness, B = Emission
+    // R = Metallic, G = Emission, B = Roughness
     std::vector<std::string> metallicPaths = {
-        "assets/textures/blocks/roughness100_mer.png", // STONE (0) - Gris par défaut
-        "assets/textures/blocks/roughness100_mer.png", // DIRT (1) - Gris par défaut
-        "assets/textures/blocks/all_concrete_powder_mer.png" // GRASS (2) (Temporaire)
+        "assets/textures/blocks/stone_mer.tga",        // Index 0
+        "assets/textures/blocks/dirt_mer.tga",         // Index 1
+        "assets/textures/blocks/grass_top_mer.tga",    // Index 2
+        "assets/textures/blocks/grass_side_mer.tga"    // Index 3
     };
 
     // Chargement des 3 Texture Arrays

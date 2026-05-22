@@ -1,8 +1,0 @@
-{
-  "format_version": "1.16.100",
-  "minecraft:texture_set": {
-    "color": "concrete_powder_purple",
-    "metalness_emissive_roughness": "all_concrete_powder_mer",
-    "normal": "all_concrete_powder_normal"
-  }
-}

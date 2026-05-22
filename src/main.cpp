@@ -169,14 +169,6 @@ int main( void ) {
     );
     camera.setMode(FREE_CAMERA, window);
 
-    std::vector<std::string> textureFiles = {
-        "assets/textures/blocks/dirt.png",
-        "assets/textures/blocks/grass_path_top.png",
-        "assets/textures/blocks/grass_side_carried.png",
-        "assets/textures/blocks/stone.png"
-    };
-    GLuint textureArrayID = loadTextureArray(textureFiles);
-
     do {
         // Calcul du deltaTime
         float currentFrame = glfwGetTime();
@@ -205,11 +197,6 @@ int main( void ) {
         if (debugWireframe) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         }
-        
-        // On active le Texture Array pour le shader
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D_ARRAY, textureArrayID);
-        glUniform1i(glGetUniformLocation(basicProgramID, "textureSampler"), 0);
 
         // Utiliser le shader PBR
         glUseProgram(pbrProgramID);

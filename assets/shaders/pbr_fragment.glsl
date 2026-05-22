@@ -75,10 +75,11 @@ void main() {
     // Transform normal to world space using TBN
     normal = normalize(fs_in.TBN * normal);
     
-    // Extract metallic and roughness from metallic map
-    // Assuming: R=metallic, G=unused/roughness, B=unused
+    // DECODAGE FORMAT BEDROCK RTX (MER) :
+    // R = Metallic, G = Emission, B = Roughness
     float metallic = metallicSample.r;
-    float roughness = metallicSample.g;
+    float emission = metallicSample.g;
+    float roughness = metallicSample.b;
     
     // Clamp roughness to avoid artifacts
     roughness = max(roughness, 0.04);
@@ -121,6 +122,9 @@ void main() {
     vec3 ambient = vec3(0.03) * albedo; // modif temporaire
     
     vec3 color = ambient + Lo;
+    
+    // Ajout de l'émission (pour les blocs lumineux)
+    color += albedo * emission * 5.0;
     
     // Tone mapping (Reinhard)
     color = color / (color + vec3(1.0));
