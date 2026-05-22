@@ -128,7 +128,7 @@ int main( void ) {
     // 0 = SimpleChunk (pour tester winding order + culling)
     // 1 = TerrainGenerator (pour tester la génération procédural)
     // 2 = DynamicTerrain (pour tester TerrainSystem + PathFindingSystem)
-    #define ACTIVE_SCENE 2
+    #define ACTIVE_SCENE 1
     
     if (ACTIVE_SCENE == 0) {
         TestScenes::createSimpleChunk(registry);
@@ -181,12 +181,10 @@ int main( void ) {
         glm::mat4 viewMatrix = camera.getViewMatrix();
         glm::mat4 projMatrix = camera.getProjectionMatrix();
 
-        // Update ECS Systems
-        meshingSystem.update(registry);
-        
-        // Bonus dev systems (terrain generation + pathfinding)
+        // Update ECS Systems     
         terrainSystem.update(registry);
         pathFindingSystem.update(registry);
+        meshingSystem.update(registry);
         
         // Apply debug wireframe mode
         if (debugWireframe) {
