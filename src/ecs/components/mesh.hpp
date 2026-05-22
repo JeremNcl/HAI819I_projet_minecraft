@@ -29,7 +29,4 @@ struct MeshComponent : public Component {
         indexCount = 0;
     }
 
-    ~MeshComponent() {
-        cleanup();
-    }
 };

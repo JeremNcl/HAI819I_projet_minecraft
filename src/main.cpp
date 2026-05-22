@@ -186,56 +186,103 @@ int main( void ) {
     std::vector<std::string> textureFiles = {
         "assets/textures/blocks/dirt.png",
         "assets/textures/blocks/grass_path_top.png",
-        "assets/textures/blocks/grass_side_carried.png",
+        "assets/textures/blocks/grass_side.png",
         "assets/textures/blocks/stone.png"
     };
     GLuint textureArrayID = loadTextureArray(textureFiles);
 
+    bool isLoading = true;
+    const int TARGET_CHUNKS = 289;
+
     do {
-        // Calcul du deltaTime
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
+        if (deltaTime > 0.1f) {
+            deltaTime = 0.1f; 
+        }
         lastFrame = currentFrame;
+        
 
-        // Clear the screen
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Update ECS Systems
-        meshingSystem.update(registry);
-        inputSystem.update(registry, window);
-        cameraSystem.update(registry, deltaTime);
-        windowSystem.update(registry, window);        
         terrainSystem.update(registry);
-        pathFindingSystem.update(registry);
-        renderSystem.update(registry, basicProgramID);
-        
-        // Apply debug wireframe mode
-        if (debugWireframe) {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        meshingSystem.update(registry);
+
+        if (isLoading && terrainSystem.getLoadedChunksCount() >= TARGET_CHUNKS) {
+            if (meshingSystem.isMeshingComplete(registry)) {
+                isLoading = false;
+            }
         }
-        
-        // On active le Texture Array pour le shader
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D_ARRAY, textureArrayID);
-        glUniform1i(glGetUniformLocation(basicProgramID, "textureSampler"), 0);
 
-        // Restore normal fill mode BEFORE ImGui
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        if (isLoading) {
 
-        // === ImGui Debug UI ===
-        ImGui_ImplOpenGL3_NewFrame();
-        debugSystem.update(registry, window, deltaTime);
-        
-        // Disable depth test for ImGui rendering (it's 2D overlay)
-        glDisable(GL_DEPTH_TEST);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        glEnable(GL_DEPTH_TEST);
+            windowSystem.update(registry, window);
 
-        // Swap buffers
+            int displayW, displayH;
+            glfwGetFramebufferSize(window, &displayW, &displayH);
+            
+            ImGuiIO& current_io = ImGui::GetIO();
+            current_io.DisplaySize = ImVec2((float)displayW, (float)displayH);
+
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui::NewFrame();
+
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
+            ImGui::SetNextWindowSize(current_io.DisplaySize);
+            ImGui::Begin("LoadingScreen", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
+
+            // --- CALCULS DU MAILLAGE ---
+            int totalExpectedMeshes = 6552;//TARGET_CHUNKS * 16; // 16 sous-chunks verticaux par chunk
+            int currentMeshesReady = meshingSystem.getCompletedMeshCount(registry);
+            float progress = (float)currentMeshesReady / totalExpectedMeshes;
+            // ----------------------------
+
+            ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.45f));
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "GENERATION DES MAILLAGES (MESHES)...");
+            
+            ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.50f));
+            ImGui::Text("Meshes prepares : %d / %d", currentMeshesReady, totalExpectedMeshes);
+            
+            ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.25f, current_io.DisplaySize.y * 0.55f));
+            ImGui::ProgressBar(progress, ImVec2(current_io.DisplaySize.x * 0.5f, 30.0f));
+
+            ImGui::End();
+            ImGui::Render();
+
+            glDisable(GL_DEPTH_TEST);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            glEnable(GL_DEPTH_TEST);
+
+        } else {
+
+            inputSystem.update(registry, window);
+            cameraSystem.update(registry, deltaTime);
+            windowSystem.update(registry, window);        
+            pathFindingSystem.update(registry);
+            renderSystem.update(registry, basicProgramID);
+            
+            if (debugWireframe) {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            }
+            
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, textureArrayID);
+            glUniform1i(glGetUniformLocation(basicProgramID, "textureSampler"), 0);
+
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+            ImGui_ImplOpenGL3_NewFrame();
+            debugSystem.update(registry, window, deltaTime);
+            
+            glDisable(GL_DEPTH_TEST);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            glEnable(GL_DEPTH_TEST);
+        }
+
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-    } // Check if the ESC key was pressed or the window was closed
+    } 
     while( (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) && (glfwWindowShouldClose(window) == 0) );
 
     // Cleanup ImGui

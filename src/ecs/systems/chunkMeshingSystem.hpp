@@ -7,12 +7,11 @@
 #include <glm/glm.hpp>
 #include <GL/glew.h>
 #include <vector>
-#include <unordered_map>
+
 
 
 #ifndef GLM_VEC3_HASH_DEFINED
 #define GLM_VEC3_HASH_DEFINED
-
 struct GLMVec3Hash {
     std::size_t operator()(const glm::ivec3& k) const {
         return std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1) ^ (std::hash<int>()(k.z) << 2);
@@ -20,7 +19,7 @@ struct GLMVec3Hash {
 };
 #endif
 
-using SubChunkCache = std::unordered_map<glm::ivec3, const SubChunkComponent*, GLMVec3Hash>;
+using subChunkCache = std::vector<const SubChunkComponent*>;
 
 struct Vertex {
     glm::vec3 position;
@@ -33,12 +32,14 @@ public:
     ChunkMeshingSystem() = default;
 
     void update(Registry& registry);
+    bool isMeshingComplete(Registry& registry) const;
+    int getCompletedMeshCount(Registry& registry) const;
 
 private:
     void generateMesh(Registry& registry, EntityID entity,
                       SubChunkComponent& voxelData,
                       MeshComponent& mesh,
-                      const SubChunkCache& cache);
+                      const subChunkCache& cache);
 
     void addFace(std::vector<Vertex>& vertices,
                  std::vector<GLuint>& indices,
@@ -50,4 +51,6 @@ private:
                  int axis,
                  glm::vec3 worldOffset);
 
-    VoxelType getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const SubChunkCache& cache) const;};
+    VoxelType getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const;
+    
+};

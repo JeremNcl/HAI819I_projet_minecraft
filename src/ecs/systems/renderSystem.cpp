@@ -38,17 +38,14 @@ bool RenderSystem::isAABBInFrustum(const glm::vec3& min, const glm::vec3& max, c
     return true;
 }
 
-void RenderSystem::renderMesh(GLuint shaderProgram,
+void RenderSystem::renderMesh(GLint locMVP,
                               const MeshComponent& mesh,
                               const glm::mat4& modelMatrix,
                               const glm::mat4& viewMatrix,
                               const glm::mat4& projectionMatrix) {
     if (mesh.VAO == 0 || mesh.indexCount == 0) return;
 
-    glUseProgram(shaderProgram);
-
     glm::mat4 MVP = projectionMatrix * viewMatrix * modelMatrix;
-    GLint locMVP = glGetUniformLocation(shaderProgram, "MVP");
     glUniformMatrix4fv(locMVP, 1, GL_FALSE, glm::value_ptr(MVP));
 
     glBindVertexArray(mesh.VAO);
@@ -83,6 +80,8 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram) {
 
     if (!camera) return;
 
+    glUseProgram(shaderProgram);
+    GLint locMVP = glGetUniformLocation(shaderProgram, "MVP");
     glm::mat4 vpMatrix = camera->projectionMatrix * camera->viewMatrix;
     std::array<glm::vec4, 6> frustumPlanes;
     extractFrustumPlanes(vpMatrix, frustumPlanes);
@@ -101,13 +100,12 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram) {
                 continue;
             }
         }
-
         glm::mat4 modelMatrix = glm::mat4(1.0f);
         modelMatrix = glm::translate(modelMatrix, transform.position);
         modelMatrix = glm::scale(modelMatrix, transform.scale);
-
-        renderMesh(shaderProgram, mesh, modelMatrix, camera->viewMatrix, camera->projectionMatrix);
+        renderMesh(locMVP, mesh, modelMatrix, camera->viewMatrix, camera->projectionMatrix);
     }
-
+    glBindVertexArray(0);
     glUseProgram(0);
 }
+
