@@ -44,6 +44,8 @@ using namespace glm;
 #include "ecs/systems/debugSystem.hpp"
 #include "ecs/systems/PathFindingSystem.hpp"
 #include "ecs/systems/TerrainSystem.hpp"
+#include "ecs/systems/movementSystem.hpp"
+#include "ecs/systems/physicsSystem.hpp"
 
 //void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -150,6 +152,8 @@ int main( void ) {
     WindowSystem windowSystem;
     CameraSystem cameraSystem;
     DebugSystem debugSystem;
+    MovementSystem movementSystem;
+    PhysicsSystem physicsSystem;
     
     // Systèmes du dev bonus
     TerrainConfig config = LoadConfig("config.txt");
@@ -168,6 +172,8 @@ int main( void ) {
     });
     registry.addComponent(camEntity, CameraComponent{ .isActive = true});
     registry.addComponent(camEntity, InputReceiverComponent{});
+    registry.addComponent(camEntity, RigidBodyComponent{});
+    registry.addComponent(camEntity, VelocityComponent{});
 
     cameraSystem.initCamera(registry, camEntity, 90, 0);
 
@@ -203,11 +209,12 @@ int main( void ) {
         // Update ECS Systems
         meshingSystem.update(registry);
         inputSystem.update(registry, window);
+        physicsSystem.update(registry, deltaTime);
+        movementSystem.update(registry, deltaTime);
         cameraSystem.update(registry, deltaTime);
         windowSystem.update(registry, window);        
         terrainSystem.update(registry);
         pathFindingSystem.update(registry);
-        meshingSystem.update(registry);
         renderSystem.update(registry, basicProgramID);
         
         // Apply debug wireframe mode
