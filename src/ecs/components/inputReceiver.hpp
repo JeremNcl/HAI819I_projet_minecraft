@@ -21,7 +21,7 @@ struct InputReceiverComponent : public Component {
     double mouseX = 0.;
     double mouseY = 0.;
 
-    float mouseSensitivity = .05f;
+    float mouseSensitivity = .005f;
     float movementSpeed = 5.f;
 
     InputReceiverComponent() = default;

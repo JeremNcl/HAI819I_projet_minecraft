@@ -2,8 +2,8 @@
 #ifndef INPUTSYSTEM_HPP
 #define INPUTSYSTEM_HPP
 
-#include "../../ecs/registry.hpp"
-#include "../../ecs/components/inputReceiver.hpp"
+#include "../registry.hpp"
+#include "../components/inputReceiver.hpp"
 #include <GLFW/glfw3.h>
 
 class InputSystem {

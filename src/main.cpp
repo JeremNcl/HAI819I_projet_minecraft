@@ -38,6 +38,8 @@ using namespace glm;
 #include "ecs/systems/renderSystem.hpp"
 #include "ecs/systems/inputSystem.hpp"
 #include "ecs/systems/cameraSystem.hpp"
+#include "ecs/systems/windowSystem.hpp"
+#include "ecs/systems/debugSystem.hpp"
 
 //void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -156,7 +158,9 @@ int main( void ) {
     ChunkMeshingSystem meshingSystem;
     RenderSystem renderSystem;
     InputSystem inputSystem(window);
+    WindowSystem windowSystem;
     CameraSystem cameraSystem;
+    DebugSystem debugSystem;
 
     EntityID camEntity = registry.createEntity();
     registry.addComponent(camEntity, TransformComponent{
@@ -166,12 +170,8 @@ int main( void ) {
     registry.addComponent(camEntity, CameraComponent{ .isActive = true });
     registry.addComponent(camEntity, InputReceiverComponent{});
 
-    //Setup curseur
-    inputSystem.setCursorMode(window, false);
-
-    bool isFullscreen = false;
-    int windowedX = 100, windowedY = 100;
-    int windowedWidth = 1024, windowedHeight = 768;
+    //Setup curseur au demarrage
+    inputSystem.setCursorMode(window, true);
 
     int major, minor, rev;
     glfwGetVersion(&major, &minor, &rev);
@@ -182,100 +182,26 @@ int main( void ) {
     printf("Contrôles: ZQSD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation\n");
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
-    // Initialisation de la caméra (Mode Libre par défaut)
-    /* Camera camera;
-    camera.initialize(
-        glm::vec3(8.0f, 20.0f, 8.0f),   // Position initiale en hauteur
-        glm::vec3(8.0f, 0.0f, -8.0f),   // Regarde vers le bas
-        glm::vec3(0.0f, 1.0f, 0.0f),    // Vecteur Up
-        15.0f                           // Vitesse
-    );
-    camera.setMode(FREE_CAMERA, window); */
-
     do {
         // Calcul du deltaTime
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        // Inputs
-        //processInput(window, camera);
-
         // Clear the screen
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // Update Caméra
-        //camera.update(window, deltaTime);
-        
-        // Calcul ViewProjection
-        //glm::mat4 viewMatrix = camera.getViewMatrix();
-        //glm::mat4 projMatrix = camera.getProjectionMatrix();
 
         // Update ECS Systems
         meshingSystem.update(registry);
         renderSystem.update(registry, basicProgramID);
         inputSystem.update(registry, window);
         cameraSystem.update(registry, deltaTime);
-
-        if (registry.hasComponent<InputReceiverComponent>(camEntity)) {
-            InputReceiverComponent& input = registry.getComponent<InputReceiverComponent>(camEntity);
-            
-            if (input.toggleFullscreen) {
-                isFullscreen = !isFullscreen;
-
-                if (isFullscreen) {
-                    // 1. Sauvegarder la position et la taille de la fenêtre actuelle
-                    glfwGetWindowPos(window, &windowedX, &windowedY);
-                    glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
-
-                    // 2. Récupérer le moniteur principal et sa résolution native
-                    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-                    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-
-                    // 3. Basculer en Plein écran matériel (le taux de rafraîchissement est calé sur l'écran)
-                    glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
-                    printf("[INFO] Passage en mode Plein Écran (%dx%d @ %dHz)\n", mode->width, mode->height, mode->refreshRate);
-                } 
-                else {
-                    // Revenir en mode fenêtré restauré à sa position d'origine
-                    glfwSetWindowMonitor(window, NULL, windowedX, windowedY, windowedWidth, windowedHeight, 0);
-                    printf("[INFO] Retour en mode Fenêtré (%dx%d)\n", windowedWidth, windowedHeight);
-                }
-                
-                // Très important sous WSL : forcer un rafraîchissement du mode de capture de la souris
-                inputSystem.setCursorMode(window, true);
-            }
-        }
+        windowSystem.update(registry, window);        
         
 
         // === ImGui Debug UI ===
-        ImGuiIO& io = ImGui::GetIO();
-        int displayW, displayH;
-        glfwGetWindowSize(window, &displayW, &displayH);
-        io.DisplaySize = ImVec2((float)displayW, (float)displayH);
-        
         ImGui_ImplOpenGL3_NewFrame();
-        ImGui::NewFrame();
-
-        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(350, 200), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Debug Info")) {
-            ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "=== Camera Debug ===");
-            
-            /* glm::vec3 camPos = camera.getPosition();
-            ImGui::Text("Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
-            
-            glm::vec3 camFront = camera.getFront();
-            ImGui::Text("Direction: (%.2f, %.2f, %.2f)", camFront.x, camFront.y, camFront.z); */
-            
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "=== Performance ===");
-            ImGui::Text("FPS: %.1f", 1.0f / deltaTime);
-            ImGui::Text("DeltaTime: %.4f ms", deltaTime * 1000.0f);
-        }
-        ImGui::End();
-
-        ImGui::Render();
+        debugSystem.update(registry, window, deltaTime);
         
         // Disable depth test for ImGui rendering (it's 2D overlay)
         glDisable(GL_DEPTH_TEST);
@@ -300,20 +226,6 @@ int main( void ) {
     glfwTerminate();
     return 0;
 }
-
-// Gestion des inputs
-/* void processInput(GLFWwindow *window, Camera& camera) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-    
-    // Fullscreen toggle with F11 (requires GLFW 3.2+, we have 3.1, so simplified)
-    static bool f11_pressed_last = false;
-    bool f11_pressed = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
-    if (f11_pressed && !f11_pressed_last) {
-        printf("[DEBUG] F11 pressed - fullscreen toggle not fully supported in GLFW 3.1\n");
-    }
-    f11_pressed_last = f11_pressed;
-} */
 
 // Resize callback
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {

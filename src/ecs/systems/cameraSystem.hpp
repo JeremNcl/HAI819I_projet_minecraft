@@ -2,10 +2,10 @@
 #ifndef CAMERASYSTEM_HPP
 #define CAMERASYSTEM_HPP
 
-#include "../../ecs/registry.hpp"
-#include "../../ecs/components/transform.hpp"
-#include "../../ecs/components/camera.hpp"
-#include "../../ecs/components/inputReceiver.hpp"
+#include "../registry.hpp"
+#include "../components/transform.hpp"
+#include "../components/camera.hpp"
+#include "../components/inputReceiver.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
