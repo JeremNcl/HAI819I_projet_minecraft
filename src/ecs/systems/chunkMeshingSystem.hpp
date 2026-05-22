@@ -11,7 +11,7 @@
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
-    glm::vec3 color;  // RGB color per vertex
+    glm::vec3 texCoords;
 };
 
 class ChunkMeshingSystem {
@@ -31,7 +31,8 @@ private:
                  glm::vec3 edge1,
                  glm::vec3 edge2,
                  glm::vec3 normal,
-                 glm::vec3 color);
+                 float texIndex,
+                 int axis);
 
     bool isVoxelSolid(const ChunkComponent& voxelData, int x, int y, int z) const;
 };

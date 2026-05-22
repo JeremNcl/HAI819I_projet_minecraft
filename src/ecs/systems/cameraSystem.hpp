@@ -12,8 +12,9 @@
 
 class CameraSystem {
     public:
-        //TODO : Ajoutez un constructeur pour init les ratios des camera
         void update(Registry& _registry, float _deltaTime);
+
+        void initCamera(Registry& _registry, EntityID _entity, float _yaw, float _pitch);
 };
 
 #endif

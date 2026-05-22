@@ -207,14 +207,18 @@ public:
         };
 
         Iterator begin() const {
-            if (!s1 || s1->getDense().empty()) {
-                return Iterator(&s1->getDense(), s2, s1->getDense().size());
+            if (!s1 || !s2 || s1->getDense().empty()) {
+                static const std::vector<EntityID> emptyDense;
+                return Iterator(&emptyDense, s2, 0);
             }
             return Iterator(&s1->getDense(), s2, 0);
         }
 
         Iterator end() const {
-            if (!s1) return Iterator(&s1->getDense(), s2, 0);
+            if (!s1 || !s2 || s1->getDense().empty()) {
+                static const std::vector<EntityID> emptyDense;
+                return Iterator(&emptyDense, s2, 0);
+            }
             return Iterator(&s1->getDense(), s2, s1->getDense().size());
         }
     };

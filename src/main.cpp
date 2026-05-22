@@ -25,7 +25,9 @@ using namespace glm;
 // Inclusions de notre moteur (Nouvelle architecture ECS)
 #include "engine/render/shader.hpp"
 #include "engine/io/textureLoader.hpp"
-//#include "engine/scene/camera.hpp"
+#include "modules/terrain_gen/TerrainGenerator.hpp"
+#include "modules/pathfinding/PathFinder3D.hpp"
+#include "game/testScenes.hpp"
 
 // ECS Includes
 #include "ecs/registry.hpp"
@@ -40,6 +42,8 @@ using namespace glm;
 #include "ecs/systems/cameraSystem.hpp"
 #include "ecs/systems/windowSystem.hpp"
 #include "ecs/systems/debugSystem.hpp"
+#include "ecs/systems/PathFindingSystem.hpp"
+#include "ecs/systems/TerrainSystem.hpp"
 
 //void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -47,6 +51,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+// Debug flags
+bool debugWireframe = false;
 
 /*******************************************************************************/
 
@@ -64,7 +71,7 @@ int main( void ) {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); 
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow( 1024, 768, "Voxel Engine - Prototype", NULL, NULL);
+    window = glfwCreateWindow( 1024, 720, "Voxel Engine - Prototype", NULL, NULL);
     if( window == NULL ){
         fprintf(stderr, "Failed to open GLFW window.\n");
         getchar();
@@ -86,7 +93,7 @@ int main( void ) {
 
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
     glfwPollEvents();
-    glfwSetCursorPos(window, 1024/2, 768/2);
+    glfwSetCursorPos(window, 1024/2, 720/2);
 
     // Couleur de fond (Ciel bleu typique)
     glClearColor(0.39f, 0.65f, 0.85f, 1.0f);
@@ -95,9 +102,9 @@ int main( void ) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    // Activation du Culling (Indispensable pour les Voxels)
-    // Modification temporaire : désactivé pour debugger les faces visibles
-    glDisable(GL_CULL_FACE);
+    // Enable face culling for performance (CCW winding order)
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 
     GLuint VertexArrayID;
     glGenVertexArrays(1, &VertexArrayID);
@@ -117,42 +124,24 @@ int main( void ) {
     
     // === INITIALISATION DU MONDE ECS ===
     
-    printf("=== PREMIER TEST : AFFICHAGE D'UN CHUNK ===\n");
+    printf("=== ECS Monde Initialization ===\n");
     printf("Initialisation de la Registry ECS...\n");
     
-    // Créer la Registry ECS
     Registry registry;
     
-    // Créer 1 chunk de test
-    EntityID testChunkEntity = registry.createEntity();
-    printf("Chunk créé (EntityID: %u)\n", testChunkEntity);
+    // === SELECT TEST SCENE ===
+    // 0 = SimpleChunk (pour tester winding order + culling)
+    // 1 = TerrainGenerator (pour tester la génération procédural)
+    // 2 = DynamicTerrain (pour tester TerrainSystem + PathFindingSystem)
+    #define ACTIVE_SCENE 1
     
-    // Remplir le chunk avec des données voxel (terrain manuel pour démo)
-    ChunkComponent chunkData(glm::ivec3(0, 0, 0));
-    printf("Génération du terrain manuel (16×256×16 voxels)...\n");
-    
-    // Remplissage manuel : couche pierre en bas, puis dirt, puis herbe
-    for (int x = 0; x < 16; ++x) {
-        for (int z = 0; z < 16; ++z) {
-            for (int y = 0; y < 256; ++y) {
-                if (y < 5) {
-                    chunkData.setVoxel(x, y, z, VoxelType::STONE);
-                } else if (y < 10) {
-                    chunkData.setVoxel(x, y, z, VoxelType::DIRT);
-                } else if (y == 10) {
-                    chunkData.setVoxel(x, y, z, VoxelType::GRASS);
-                } else {
-                    chunkData.setVoxel(x, y, z, VoxelType::AIR);
-                }
-            }
-        }
+    if (ACTIVE_SCENE == 0) {
+        TestScenes::createSimpleChunk(registry);
+    } else if (ACTIVE_SCENE == 1) {
+        TestScenes::createTerrainChunk(registry);
+    } else if (ACTIVE_SCENE == 2) {
+        TestScenes::createDynamicTerrainScene(registry);
     }
-    printf("  → %u voxels créés (STONE: 0-5, DIRT: 5-10, GRASS: 10)\n", VOXEL_ARRAY_SIZE);
-    chunkData.meshDirty = true;  // Marquer pour remaillage
-    
-    registry.addComponent(testChunkEntity, chunkData);
-    registry.addComponent(testChunkEntity, MeshComponent());
-    registry.addComponent(testChunkEntity, TransformComponent(glm::vec3(0.0f, 0.0f, 0.0f)));
     
     // Créer les systèmes
     ChunkMeshingSystem meshingSystem;
@@ -161,14 +150,26 @@ int main( void ) {
     WindowSystem windowSystem;
     CameraSystem cameraSystem;
     DebugSystem debugSystem;
+    
+    // Systèmes du dev bonus
+    TerrainConfig config = LoadConfig("config.txt");
+    TerrainSystem terrainSystem(config);
+    PathFindingSystem pathFindingSystem;
+    
+    printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem).\n");
+    printf("Caméra initialisée en mode FREE_CAMERA.\n");
+    printf("Contrôles: WASD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation\n");
+    printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     EntityID camEntity = registry.createEntity();
     registry.addComponent(camEntity, TransformComponent{
-        glm::vec3(0,0,3),
+        glm::vec3(45,50,-55),
         glm::vec3(0,0,0)
     });
-    registry.addComponent(camEntity, CameraComponent{ .isActive = true });
+    registry.addComponent(camEntity, CameraComponent{ .isActive = true});
     registry.addComponent(camEntity, InputReceiverComponent{});
+
+    cameraSystem.initCamera(registry, camEntity, 90, 0);
 
     //Setup curseur au demarrage
     inputSystem.setCursorMode(window, true);
@@ -182,6 +183,14 @@ int main( void ) {
     printf("Contrôles: ZQSD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation\n");
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
+    std::vector<std::string> textureFiles = {
+        "assets/textures/blocks/dirt.png",
+        "assets/textures/blocks/grass_path_top.png",
+        "assets/textures/blocks/grass_side_carried.png",
+        "assets/textures/blocks/stone.png"
+    };
+    GLuint textureArrayID = loadTextureArray(textureFiles);
+
     do {
         // Calcul du deltaTime
         float currentFrame = glfwGetTime();
@@ -193,11 +202,26 @@ int main( void ) {
 
         // Update ECS Systems
         meshingSystem.update(registry);
-        renderSystem.update(registry, basicProgramID);
         inputSystem.update(registry, window);
         cameraSystem.update(registry, deltaTime);
         windowSystem.update(registry, window);        
+        terrainSystem.update(registry);
+        pathFindingSystem.update(registry);
+        meshingSystem.update(registry);
+        renderSystem.update(registry, basicProgramID);
         
+        // Apply debug wireframe mode
+        if (debugWireframe) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+        
+        // On active le Texture Array pour le shader
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, textureArrayID);
+        glUniform1i(glGetUniformLocation(basicProgramID, "textureSampler"), 0);
+
+        // Restore normal fill mode BEFORE ImGui
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         // === ImGui Debug UI ===
         ImGui_ImplOpenGL3_NewFrame();

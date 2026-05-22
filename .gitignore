@@ -36,3 +36,7 @@ Roadmap_v3.md
 # Fichiers archivés
 archive*
 *.tar.gz
+
+# Makefiles générés par les dépendances externes
+external/glew-1.13.0/Makefile
+external/glew-1.13.0/auto/Makefile

@@ -2,6 +2,8 @@
 #define TEXTURE_LOADER_HPP
 
 #include <GL/glew.h>
+#include <vector>
+#include <string>
 
 // Load a .BMP file using our custom loader
 GLuint loadBMP_custom(const char * imagepath);
@@ -13,6 +15,8 @@ GLuint loadBMP_custom(const char * imagepath);
 
 // Load a .DDS file using GLFW's own loader
 GLuint loadDDS(const char * imagepath);
+
+GLuint loadTextureArray(const std::vector<std::string>& filepaths);
 
 
 #endif

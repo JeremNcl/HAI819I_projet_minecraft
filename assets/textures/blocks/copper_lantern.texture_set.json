@@ -1,0 +1,8 @@
+{
+  "format_version": "1.21.30",
+  "minecraft:texture_set": {
+    "color": "copper_lantern",
+    "metalness_emissive_roughness": "all_copper_lantern_mer",
+    "normal": "all_copper_lantern_normal"
+  }
+}

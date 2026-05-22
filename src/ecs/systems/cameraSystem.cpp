@@ -48,3 +48,24 @@ void CameraSystem::update(Registry& _registry, float _deltaTime) {
         );
     }
 }
+
+void CameraSystem::initCamera(Registry& _registry, EntityID _entity, float _yaw, float _pitch) {
+    if (!_registry.hasComponent<CameraComponent>(_entity)) return;
+
+    CameraComponent& camera = _registry.getComponent<CameraComponent>(_entity);
+
+    camera.yaw = _yaw;
+    camera.pitch = _pitch;
+
+    float yawR = glm::radians(_yaw);
+    float pitchR = glm::radians(_pitch);
+
+    camera.front = glm::normalize(glm::vec3(
+        cos(yawR) * cos(pitchR),
+        sin(pitchR),
+        sin(yawR) * cos(pitchR)
+    ));
+
+    camera.right = glm::normalize(glm::cross(camera.front, glm::vec3(0.0f, 1.0f, 0.0f)));
+    camera.up = glm::normalize(glm::cross(camera.right, camera.front));
+}
