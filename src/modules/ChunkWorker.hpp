@@ -5,10 +5,11 @@
 #include <vector>
 #include <atomic>
 #include "terrain_gen/TerrainGenerator.hpp"
+#include <array>
 
 struct ChunkTask {
     int x, z;
-    std::vector<BlockType> data;
+    std::array<std::vector<BlockType>, 16> data;
     bool ready = false;
 };
 
