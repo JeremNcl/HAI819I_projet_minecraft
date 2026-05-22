@@ -1,0 +1,8 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "mangrove_door_top",
+    "metalness_emissive_roughness": "roughness125_mer",
+    "normal": "all_door_upper_normal"
+  }
+}

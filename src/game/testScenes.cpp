@@ -55,8 +55,8 @@ void createTerrainChunk(Registry& registry) {
     TerrainConfig config = LoadConfig("config.txt");
     TerrainGenerator generator(config);
 
-    int numChunksX = 2;
-    int numChunksZ = 2;
+    int numChunksX = 5;
+    int numChunksZ = 5;
     int chunksGenerated = 0;
 
     for (int chunkX = 0; chunkX < numChunksX; ++chunkX) {

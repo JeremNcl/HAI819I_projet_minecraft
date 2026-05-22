@@ -1,0 +1,8 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "crimson_door_lower",
+    "metalness_emissive_roughness": "roughness125_mer",
+    "normal": "all_door_lower_normal"
+  }
+}

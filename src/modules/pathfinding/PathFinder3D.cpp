@@ -7,6 +7,14 @@ int PathFinder3D::GetDistance(glm::ivec3 a, glm::ivec3 b) const {
 }
 
 std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 targetPos, Registry& registry) {
+    
+    ChunkCache chunkCache;
+    auto view = registry.view<ChunkComponent, MeshComponent>();
+    for (EntityID entity : view) {
+        const auto& chunk = registry.getComponent<ChunkComponent>(entity);
+        chunkCache[glm::ivec2(chunk.chunkPosition.x, chunk.chunkPosition.z)] = &chunk;
+    }
+
     std::priority_queue<PathNode, std::vector<PathNode>, std::greater<PathNode>> openSet;
     std::unordered_map<glm::ivec3, int, GLMVec3Hash> gCostMap;
     std::unordered_map<glm::ivec3, glm::ivec3, GLMVec3Hash> parentMap;
@@ -29,7 +37,7 @@ std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 t
 
         if (currentNode.gCost > gCostMap[currentNode.pos]) continue;
 
-        for (glm::ivec3 neighborPos : GetValidNeighbors(currentNode.pos, registry)) {
+        for (glm::ivec3 neighborPos : GetValidNeighbors(currentNode.pos, chunkCache)) {
             int newMovementCostToNeighbor = currentNode.gCost + 1;
 
             if (gCostMap.find(neighborPos) == gCostMap.end() || newMovementCostToNeighbor < gCostMap[neighborPos]) {
@@ -40,6 +48,7 @@ std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 t
             }
         }
     }
+    
     std::cout << "Aucun chemin trouve ! (Cible inaccessible)\n";
     return std::vector<glm::ivec3>(); 
 }
@@ -55,7 +64,7 @@ std::vector<glm::ivec3> PathFinder3D::RetracePath(std::unordered_map<glm::ivec3,
     return path;
 }
 
-std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, Registry& registry) {
+std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, const ChunkCache& chunkCache) {
     std::vector<glm::ivec3> neighbors;
     glm::ivec3 directions[6] = {
         glm::ivec3( 1,  0,  0), glm::ivec3(-1,  0,  0),
@@ -66,29 +75,28 @@ std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, R
     for (int i = 0; i < 6; ++i) {
         glm::ivec3 neighborPos = currentPos + directions[i];
         
-        if (!IsBlockSolid(neighborPos, registry)) {
+        if (!IsBlockSolid(neighborPos, chunkCache)) {
             neighbors.push_back(neighborPos);
         }
     }
     return neighbors;
 }
 
-bool PathFinder3D::IsBlockSolid(glm::ivec3 pos, Registry& registry) const {
-    auto view = registry.view<ChunkComponent, MeshComponent>();
-    
-    for (EntityID entity : view) {
-        const auto& chunk = registry.getComponent<ChunkComponent>(entity);
-        
-        int minX = chunk.chunkPosition.x * 16;
-        int minZ = chunk.chunkPosition.z * 16;
+bool PathFinder3D::IsBlockSolid(glm::ivec3 pos, const ChunkCache& chunkCache) const {
+    if (pos.y < 0 || pos.y >= 256) return true; 
+    int chunkX = (pos.x >= 0) ? (pos.x / 16) : ((pos.x + 1) / 16) - 1;
+    int chunkZ = (pos.z >= 0) ? (pos.z / 16) : ((pos.z + 1) / 16) - 1;
 
-        if (pos.x >= minX && pos.x < minX + 16 &&
-            pos.z >= minZ && pos.z < minZ + 16 &&
-            pos.y >= 0 && pos.y < 256) {
-            
-            VoxelType type = chunk.getVoxel(pos.x - minX, pos.y, pos.z - minZ);
-            return type != VoxelType::AIR;
-        }
+    auto it = chunkCache.find(glm::ivec2(chunkX, chunkZ));
+    
+    if (it != chunkCache.end()) {
+        const ChunkComponent* chunk = it->second;
+        
+        int localX = pos.x - (chunkX * 16);
+        int localZ = pos.z - (chunkZ * 16);
+
+        VoxelType type = chunk->getVoxel(localX, pos.y, localZ);
+        return type != VoxelType::AIR;
     }
     
     return true; 

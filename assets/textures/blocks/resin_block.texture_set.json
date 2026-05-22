@@ -1,0 +1,9 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "resin_block",
+    "metalness_emissive_roughness": "roughness150_mer",
+    "normal": "resin_block_normal"
+  }
+}
+
