@@ -12,6 +12,8 @@ struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec3 texCoords;
+    glm::vec3 tangent;
+    glm::vec3 bitangent;
 };
 
 class ChunkMeshingSystem {
@@ -19,6 +21,7 @@ public:
     ChunkMeshingSystem() = default;
 
     void update(Registry& registry);
+    static void validateTBNIntegrity();
 
 private:
     void generateMesh(Registry& registry, EntityID entity,

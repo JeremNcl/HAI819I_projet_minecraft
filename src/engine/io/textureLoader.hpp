@@ -5,18 +5,20 @@
 #include <vector>
 #include <string>
 
-// Load a .BMP file using our custom loader
+struct BlockTextures {
+    GLuint colorMap;
+    GLuint normalMap;
+    GLuint metallicMap;
+};
+
 GLuint loadBMP_custom(const char * imagepath);
 
-//// Since GLFW 3, glfwLoadTexture2D() has been removed. You have to use another texture loading library, 
-//// or do it yourself (just like loadBMP_custom and loadDDS)
-//// Load a .TGA file using GLFW's own loader
-//GLuint loadTGA_glfw(const char * imagepath);
-
-// Load a .DDS file using GLFW's own loader
 GLuint loadDDS(const char * imagepath);
 
 GLuint loadTextureArray(const std::vector<std::string>& filepaths);
 
+BlockTextures loadBlockTextures(const char* colorPath, 
+                                 const char* normalPath, 
+                                 const char* metallicPath);
 
 #endif

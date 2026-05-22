@@ -25,6 +25,7 @@ using namespace glm;
 // Inclusions de notre moteur (Nouvelle architecture ECS)
 #include "engine/render/shader.hpp"
 #include "engine/io/textureLoader.hpp"
+#include "engine/render/BlockTextureManager.hpp"
 #include "engine/scene/camera.hpp"
 #include "modules/terrain_gen/TerrainGenerator.hpp"
 #include "modules/pathfinding/PathFinder3D.hpp"
@@ -108,6 +109,12 @@ int main( void ) {
     // Chargement du shader générique
     GLuint basicProgramID = LoadShaders("assets/shaders/vertex_shader.glsl", "assets/shaders/fragment_shader.glsl");
     glUseProgram(basicProgramID);
+    
+    // Chargement du shader PBR
+    GLuint pbrProgramID = LoadShaders("assets/shaders/pbr_vertex.glsl", "assets/shaders/pbr_fragment.glsl");
+    
+    // Initialisation du BlockTextureManager
+    BlockTextureManager::initialize();
     
     // === INITIALISATION ImGui ===
     IMGUI_CHECKVERSION();
@@ -204,7 +211,11 @@ int main( void ) {
         glBindTexture(GL_TEXTURE_2D_ARRAY, textureArrayID);
         glUniform1i(glGetUniformLocation(basicProgramID, "textureSampler"), 0);
 
-        renderSystem.update(registry, basicProgramID, viewMatrix, projMatrix);
+        // Utiliser le shader PBR
+        glUseProgram(pbrProgramID);
+        BlockTextureManager::bindArrays(pbrProgramID);
+
+        renderSystem.update(registry, pbrProgramID, viewMatrix, projMatrix);
         
         // Restore normal fill mode BEFORE ImGui
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -256,7 +267,9 @@ int main( void ) {
 
     // Cleanup
     glDeleteProgram(basicProgramID);
+    glDeleteProgram(pbrProgramID);
     glDeleteVertexArrays(1, &VertexArrayID);
+    BlockTextureManager::cleanup();
 
     glfwTerminate();
     return 0;

@@ -1,4 +1,5 @@
 #include "chunkMeshingSystem.hpp"
+#include "../../engine/math/TBNValidator.hpp"
 #include <algorithm>
 
 bool ChunkMeshingSystem::isVoxelSolid(const ChunkComponent& voxelData, int x, int y, int z) const {
@@ -8,12 +9,15 @@ bool ChunkMeshingSystem::isVoxelSolid(const ChunkComponent& voxelData, int x, in
 
 static float getTextureIndex(VoxelType type, int axis, bool isPositive) {
     switch (type) {
-        case VoxelType::STONE: return 3.0f;
-        case VoxelType::DIRT:  return 0.0f;
+        case VoxelType::STONE: return 0.0f; // Index 0 dans le Texture Array
+        case VoxelType::DIRT:  return 1.0f; // Index 1 dans le Texture Array
         case VoxelType::GRASS:
-            if (axis == 1 && isPositive) return 1.0f;
-            if (axis == 1 && !isPositive) return 0.0f;
-            return 2.0f;
+            if (axis == 1 && isPositive) return 2.0f; // Haut (Herbe)
+            if (axis == 1 && !isPositive) return 1.0f; // Bas (Terre)
+            // Pour les côtés de l'herbe, on met de la terre pour l'instant (1)
+            // car on n'a pas mis de texture de transition herbe/terre dans l'array.
+            // Si on mettait l'herbe (2), les côtés seraient tout verts !
+            return 2.0f; 
         default: return 0.0f;
     }
 }
@@ -39,17 +43,22 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
     glm::vec3 p2 = corner + edge1 + edge2;
     glm::vec3 p3 = corner + edge2;
 
-    vertices.push_back({p0, normal, glm::vec3(getUV(p0), texIndex)});
-    vertices.push_back({p1, normal, glm::vec3(getUV(p1), texIndex)});
-    vertices.push_back({p2, normal, glm::vec3(getUV(p2), texIndex)});
-    vertices.push_back({p3, normal, glm::vec3(getUV(p3), texIndex)});
+    glm::vec3 tangent = glm::normalize(edge1);
+    glm::vec3 bitangent = glm::normalize(edge2);
 
-    // Triangle 1
+    if constexpr (false) {
+        TBNValidator::validateTBN(tangent, bitangent, normal);
+    }
+
+    vertices.push_back({p0, normal, glm::vec3(getUV(p0), texIndex), tangent, bitangent});
+    vertices.push_back({p1, normal, glm::vec3(getUV(p1), texIndex), tangent, bitangent});
+    vertices.push_back({p2, normal, glm::vec3(getUV(p2), texIndex), tangent, bitangent});
+    vertices.push_back({p3, normal, glm::vec3(getUV(p3), texIndex), tangent, bitangent});
+
     indices.push_back(baseIdx);
     indices.push_back(baseIdx + 1);
     indices.push_back(baseIdx + 2);
 
-    // Triangle 2
     indices.push_back(baseIdx);
     indices.push_back(baseIdx + 2);
     indices.push_back(baseIdx + 3);
@@ -180,6 +189,12 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoords));
 
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, tangent));
+
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, bitangent));
+
     glGenBuffers(1, &mesh.IBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.IBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
@@ -200,4 +215,26 @@ void ChunkMeshingSystem::update(Registry& registry) {
             voxelData.meshDirty = false;
         }
     }
+}
+
+void ChunkMeshingSystem::validateTBNIntegrity() {
+    std::cout << "Validating TBN Integrity..." << std::endl;
+    
+    std::vector<glm::vec3> testCases[3] = {
+        {glm::vec3(1, 0, 0), glm::vec3(0, 1, 0), glm::vec3(0, 0, 1)},
+        {glm::vec3(0, 1, 0), glm::vec3(0, 0, 1), glm::vec3(1, 0, 0)},
+        {glm::vec3(0, 0, 1), glm::vec3(1, 0, 0), glm::vec3(0, 1, 0)},
+    };
+    
+    int passed = 0, failed = 0;
+    
+    for (int i = 0; i < 3; i++) {
+        if (TBNValidator::validateTBN(testCases[i][0], testCases[i][1], testCases[i][2])) {
+            passed++;
+        } else {
+            failed++;
+        }
+    }
+    
+    std::cout << "TBN Validation Results: " << passed << " passed, " << failed << " failed" << std::endl;
 }
