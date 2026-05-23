@@ -14,7 +14,8 @@ public:
     void update(Registry& registry, GLuint shaderProgram);
 
 private:
-    void renderMesh(GLint locMVP,
+    void renderMesh(GLuint shaderProgram,
+                    GLint locMVP,
                     const MeshComponent& mesh,
                     const glm::mat4& modelMatrix,
                     const glm::mat4& viewMatrix,

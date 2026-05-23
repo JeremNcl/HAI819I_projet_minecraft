@@ -29,6 +29,7 @@ using namespace glm;
 // Inclusions de notre moteur (Nouvelle architecture ECS)
 #include "engine/render/shader.hpp"
 #include "engine/io/textureLoader.hpp"
+#include "engine/render/BlockTextureManager.hpp"
 #include "modules/terrain_gen/TerrainGenerator.hpp"
 #include "modules/pathfinding/PathFinder3D.hpp"
 #include "game/testScenes.hpp"
@@ -122,6 +123,12 @@ int main( void ) {
     GLuint basicProgramID = LoadShaders("assets/shaders/vertex_shader.glsl", "assets/shaders/fragment_shader.glsl");
     glUseProgram(basicProgramID);
     
+    // Chargement du shader PBR
+    GLuint pbrProgramID = LoadShaders("assets/shaders/pbr_vertex.glsl", "assets/shaders/pbr_fragment.glsl");
+    
+    // Initialisation du BlockTextureManager
+    BlockTextureManager::initialize();
+    
     // === INITIALISATION ImGui ===
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -206,7 +213,6 @@ int main( void ) {
     for (unsigned int i = 0; i < numThreads; ++i) {
         workers.emplace_back(MeshingWorkerThread, std::ref(registry), std::ref(terrainSystem), std::ref(meshingSystem));
     }
-
     do {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -314,7 +320,9 @@ int main( void ) {
 
     // Cleanup
     glDeleteProgram(basicProgramID);
+    glDeleteProgram(pbrProgramID);
     glDeleteVertexArrays(1, &VertexArrayID);
+    BlockTextureManager::cleanup();
 
     glfwTerminate();
     return 0;
