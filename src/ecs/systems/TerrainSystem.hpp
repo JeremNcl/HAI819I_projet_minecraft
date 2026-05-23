@@ -1,11 +1,11 @@
 #pragma once
 
-#include "../registry.hpp"
-#include "../components/chunk.hpp"
-#include "../components/transform.hpp"
-#include "../components/mesh.hpp"
-#include "../components/camera.hpp"
-#include "../../modules/ChunkWorker.hpp"
+#include "ecs/registry.hpp"
+#include "ecs/components/chunk.hpp"
+#include "ecs/components/transform.hpp"
+#include "ecs/components/mesh.hpp"
+#include "ecs/components/camera.hpp"
+#include "modules/ChunkWorker.hpp"
 #include <map>
 #include <utility>
 #include <cmath>

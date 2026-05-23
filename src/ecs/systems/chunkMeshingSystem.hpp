@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../registry.hpp"
-#include "../components/chunk.hpp"
-#include "../components/mesh.hpp"
-#include "../components/transform.hpp"
+#include "ecs/registry.hpp"
+#include "ecs/components/chunk.hpp"
+#include "ecs/components/mesh.hpp"
+#include "ecs/components/transform.hpp"
 #include <glm/glm.hpp>
 #include <GL/glew.h>
 #include <vector>

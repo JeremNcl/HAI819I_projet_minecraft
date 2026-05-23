@@ -2,9 +2,9 @@
 #ifndef DEBUGSYSTEM_HPP
 #define DEBUGSYSTEM_HPP
 
-#include "../registry.hpp"
-#include "../components/camera.hpp"
-#include "../components/transform.hpp"
+#include "ecs/registry.hpp"
+#include "ecs/components/camera.hpp"
+#include "ecs/components/transform.hpp"
 
 #include <imgui.h>
 #include <GLFW/glfw3.h>

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "component.hpp"
-#include "../../modules/terrain_gen/TerrainGenerator.hpp"
-#include "../entity.hpp"
+#include "modules/terrain_gen/TerrainGenerator.hpp"
+#include "ecs/entity.hpp"
 #include <glm/glm.hpp>
 #include <vector>
 #include <cstdint>

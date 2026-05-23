@@ -1,7 +1,7 @@
 #pragma once
-#include "../registry.hpp"
-#include "../components/transform.hpp"
-#include "../../modules/pathfinding/PathFinder3D.hpp"
+#include "ecs/registry.hpp"
+#include "ecs/components/transform.hpp"
+#include "modules/pathfinding/PathFinder3D.hpp"
 
 struct AIComponent : public Component {
     glm::ivec3 target;

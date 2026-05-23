@@ -1,8 +1,8 @@
 #include "testScenes.hpp"
-#include "../ecs/components/chunk.hpp"
-#include "../ecs/components/mesh.hpp"
-#include "../ecs/components/transform.hpp"
-#include "../modules/terrain_gen/TerrainGenerator.hpp"
+#include "ecs/components/chunk.hpp"
+#include "ecs/components/mesh.hpp"
+#include "ecs/components/transform.hpp"
+#include "modules/terrain_gen/TerrainGenerator.hpp"
 #include <glm/glm.hpp>
 
 namespace TestScenes {

@@ -1,5 +1,5 @@
 #include "renderSystem.hpp"
-#include "../components/camera.hpp"
+#include "ecs/components/camera.hpp"
 #include <GL/glew.h>
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <queue>
+
 
 #ifndef GLM_VEC3_HASH_DEFINED
 #define GLM_VEC3_HASH_DEFINED
