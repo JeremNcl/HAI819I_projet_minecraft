@@ -146,6 +146,14 @@ void main() {
     // Gamma correction
     color = pow(color, vec3(1.0/2.2));
     
-    FragColor = vec4(color, 1.0);
+    // AFFICHER LE TBN POUR DEBUG :
+    // R = Tangente (Axe X de la texture)
+    // G = Bitangente (Axe Y de la texture)
+    // B = Normale (Axe Z de la texture)
+    FragColor = vec4(normalize(fs_in.TBN[0]) * 0.5 + 0.5, 1.0); // Affiche la Tangente
+    // FragColor = vec4(normalize(fs_in.TBN[1]) * 0.5 + 0.5, 1.0); // Affiche la Bitangente
+    // FragColor = vec4(normalize(fs_in.TBN[2]) * 0.5 + 0.5, 1.0); // Affiche la Normale
+    
+    //FragColor = vec4(color, 1.0);
 }
 
