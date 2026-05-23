@@ -123,6 +123,7 @@ public:
                 for (int subY = 0; subY < 16; ++subY){
                     EntityID subChunkEntity = registry.createEntity();
                     SubChunkComponent subChunk(glm::ivec3(result.x, subY, result.z));
+                    int solidCount = 0;
 
                     for (int y = 0; y < 16; ++y) {
                         for (int z = 0; z < 16; ++z) {
@@ -149,7 +150,10 @@ public:
                                     default:                 t = VoxelType::AIR; break;
                                 }
                                 
-                                subChunk.setVoxel(x, y, z, t);
+                                if (t != VoxelType::AIR) {
+                                    subChunk.setVoxel(x, y, z, t);
+                                    solidCount++;
+                                }
                             }
                         }
                     }
@@ -160,7 +164,12 @@ public:
                     registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f,0.0f,0.0f)));
                     
                     chunkManager.subChunks[subY] = subChunkEntity;
-                    requestMesh(subChunkEntity);
+                    if (solidCount > 0) {
+                        registry.getComponent<SubChunkComponent>(subChunkEntity).meshDirty = true;
+                        requestMesh(subChunkEntity);
+                    } else {
+                        registry.getComponent<SubChunkComponent>(subChunkEntity).meshDirty = false;
+                    }
                 }
 
                 chunkManager.isFullyGenerated = true;
@@ -177,8 +186,10 @@ public:
                             auto& neighborChunk = registry.getComponent<ChunkComponent>(neighborParent);
                             for (EntityID subID : neighborChunk.subChunks) {
                                 if (subID != 0 && registry.hasComponent<SubChunkComponent>(subID)) {
-                                    registry.getComponent<SubChunkComponent>(subID).meshDirty = true;
-                                    requestMesh(subID);
+                                    if (registry.getComponent<MeshComponent>(subID).indexCount > 0 || registry.getComponent<SubChunkComponent>(subID).meshDirty == false) {
+                                        registry.getComponent<SubChunkComponent>(subID).meshDirty = true;
+                                        requestMesh(subID);
+                                    }
                                 }
                             }
                         }

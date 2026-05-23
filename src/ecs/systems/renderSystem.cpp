@@ -82,29 +82,34 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram) {
 
     glUseProgram(shaderProgram);
     GLint locMVP = glGetUniformLocation(shaderProgram, "MVP");
+    
     glm::mat4 vpMatrix = camera->projectionMatrix * camera->viewMatrix;
+    
+    glUniformMatrix4fv(locMVP, 1, GL_FALSE, glm::value_ptr(vpMatrix));
+
     std::array<glm::vec4, 6> frustumPlanes;
     extractFrustumPlanes(vpMatrix, frustumPlanes);
 
     for (EntityID entity : view) {
         const auto& mesh = registry.getComponent<MeshComponent>(entity);
-        const auto& transform = registry.getComponent<TransformComponent>(entity);
+        
+        if (mesh.indexCount == 0 || mesh.VAO == 0) continue;
 
         if (registry.hasComponent<SubChunkComponent>(entity)) {
             const auto& subChunk = registry.getComponent<SubChunkComponent>(entity);
 
-            glm::vec3 minBounds = (glm::vec3(subChunk.subChunkPosition) * 16.0f) + transform.position;
-            glm::vec3 maxBounds = minBounds + (glm::vec3(16.0f, 16.0f, 16.0f) * transform.scale);
+            glm::vec3 minBounds = glm::vec3(subChunk.subChunkPosition) * 16.0f;
+            glm::vec3 maxBounds = minBounds + glm::vec3(16.0f, 16.0f, 16.0f);
 
             if (!isAABBInFrustum(minBounds, maxBounds, frustumPlanes)){
                 continue;
             }
         }
-        glm::mat4 modelMatrix = glm::mat4(1.0f);
-        modelMatrix = glm::translate(modelMatrix, transform.position);
-        modelMatrix = glm::scale(modelMatrix, transform.scale);
-        renderMesh(locMVP, mesh, modelMatrix, camera->viewMatrix, camera->projectionMatrix);
+        
+        glBindVertexArray(mesh.VAO);
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mesh.indexCount), GL_UNSIGNED_INT, nullptr);
     }
+    
     glBindVertexArray(0);
     glUseProgram(0);
 }

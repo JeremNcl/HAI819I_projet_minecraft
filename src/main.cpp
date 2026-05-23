@@ -225,10 +225,13 @@ int main( void ) {
         }
 
         int totalExpectedMeshes = TARGET_CHUNKS * 16;
-        int currentMeshesReady = meshingSystem.getCompletedMeshCount(registry);
+        int currentMeshesReady = 0;
 
-        if (isLoading && currentMeshesReady >= totalExpectedMeshes) {
-            isLoading = false;
+        if (isLoading) {
+            currentMeshesReady = meshingSystem.getCompletedMeshCount(registry);
+            if (currentMeshesReady >= totalExpectedMeshes) {
+                isLoading = false;
+            }
         }
 
         if (isLoading) {
