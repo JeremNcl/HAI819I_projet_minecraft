@@ -9,10 +9,15 @@
 #include <map>
 #include <utility>
 #include <cmath>
+#include <queue>
+#include <mutex>
+#include <set>
 
 class TerrainSystem {
 private:
     ChunkWorker m_worker;
+    std::set<EntityID> meshingQueue;
+    std::mutex queueMutex;
     
     std::map<std::pair<int, int>, EntityID> activeChunks;
     
@@ -37,6 +42,11 @@ private:
         registry.destroyEntity(parentEntity);
     }
 
+    void requestMesh(EntityID id) {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        meshingQueue.insert(id);
+    }
+
 public:
     TerrainSystem(const TerrainConfig& config) : m_worker(config) {}
 
@@ -48,6 +58,14 @@ public:
             }
         }
         return count;
+    }
+
+    bool popMeshingTask(EntityID& outID) {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        if (meshingQueue.empty()) return false;
+        outID = *meshingQueue.begin(); 
+        meshingQueue.erase(meshingQueue.begin());
+        return true;
     }
 
     void update(Registry& registry) {
@@ -128,6 +146,7 @@ public:
                     registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f,0.0f,0.0f)));
                     
                     chunkManager.subChunks[subY] = subChunkEntity;
+                    requestMesh(subChunkEntity);
                 }
 
                 chunkManager.isFullyGenerated = true;
@@ -145,6 +164,7 @@ public:
                             for (EntityID subID : neighborChunk.subChunks) {
                                 if (subID != 0 && registry.hasComponent<SubChunkComponent>(subID)) {
                                     registry.getComponent<SubChunkComponent>(subID).meshDirty = true;
+                                    requestMesh(subID);
                                 }
                             }
                         }
@@ -152,5 +172,19 @@ public:
                 }
             }
         }
+        
+    }
+
+    EntityID getSubChunkAt(int x, int y, int z, Registry& registry) {
+        if (y < 0 || y > 15) return 0;
+        
+        auto it = activeChunks.find({x, z});
+        if (it != activeChunks.end()) {
+            EntityID parent = it->second;
+            if (parent != 0 && registry.hasComponent<ChunkComponent>(parent)) {
+                return registry.getComponent<ChunkComponent>(parent).subChunks[y];
+            }
+        }
+        return 0;
     }
 };

@@ -7,8 +7,8 @@
 #include <glm/glm.hpp>
 #include <GL/glew.h>
 #include <vector>
-
-
+#include <queue>
+#include <mutex>
 
 #ifndef GLM_VEC3_HASH_DEFINED
 #define GLM_VEC3_HASH_DEFINED
@@ -27,6 +27,16 @@ struct Vertex {
     glm::vec3 texCoords;
 };
 
+struct MeshData {
+    std::vector<Vertex> vertices;
+    std::vector<GLuint> indices;
+};
+
+struct MeshResult {
+    EntityID entity;
+    MeshData data;
+};
+
 class ChunkMeshingSystem {
 public:
     ChunkMeshingSystem() = default;
@@ -35,11 +45,16 @@ public:
     bool isMeshingComplete(Registry& registry) const;
     int getCompletedMeshCount(Registry& registry) const;
 
+    std::queue<MeshResult> uploadQueue;
+    std::mutex uploadMutex;
+
+    MeshData calculateMeshData(Registry& registry, EntityID entity,
+                               SubChunkComponent& voxelData,
+                               const subChunkCache& cache);
+                               
+    void uploadMeshToGPU(MeshComponent& mesh, const MeshData& data);
+
 private:
-    void generateMesh(Registry& registry, EntityID entity,
-                      SubChunkComponent& voxelData,
-                      MeshComponent& mesh,
-                      const subChunkCache& cache);
 
     void addFace(std::vector<Vertex>& vertices,
                  std::vector<GLuint>& indices,
