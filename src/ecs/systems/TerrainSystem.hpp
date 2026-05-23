@@ -186,8 +186,11 @@ public:
                             auto& neighborChunk = registry.getComponent<ChunkComponent>(neighborParent);
                             for (EntityID subID : neighborChunk.subChunks) {
                                 if (subID != 0 && registry.hasComponent<SubChunkComponent>(subID)) {
-                                    if (registry.getComponent<MeshComponent>(subID).indexCount > 0 || registry.getComponent<SubChunkComponent>(subID).meshDirty == false) {
-                                        registry.getComponent<SubChunkComponent>(subID).meshDirty = true;
+                                    
+                                    auto& neighborSub = registry.getComponent<SubChunkComponent>(subID);
+                                    
+                                    if (neighborSub.solidBlockCount > 0 && !neighborSub.meshDirty) {
+                                        neighborSub.meshDirty = true;
                                         requestMesh(subID);
                                     }
                                 }

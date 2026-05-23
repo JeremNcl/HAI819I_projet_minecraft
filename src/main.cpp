@@ -343,8 +343,14 @@ void MeshingWorkerThread(Registry& registry, TerrainSystem& terrain, ChunkMeshin
             if (!registry.hasComponent<SubChunkComponent>(targetID)) continue;
             
             centerChunkCopy = registry.getComponent<SubChunkComponent>(targetID);
-            glm::ivec3 pos = centerChunkCopy.subChunkPosition;
             
+            if (centerChunkCopy.solidBlockCount == 0) {
+                std::lock_guard<std::mutex> uploadLock(meshing.uploadMutex);
+                meshing.uploadQueue.push({targetID, MeshData()});
+                continue;
+            }
+            
+            glm::ivec3 pos = centerChunkCopy.subChunkPosition;
             glm::ivec3 neededPos[6] = {
                 pos + glm::ivec3(1,0,0), pos + glm::ivec3(-1,0,0),
                 pos + glm::ivec3(0,1,0), pos + glm::ivec3(0,-1,0),
@@ -354,7 +360,10 @@ void MeshingWorkerThread(Registry& registry, TerrainSystem& terrain, ChunkMeshin
             for (int i=0; i<6; ++i) {
                 EntityID nID = terrain.getSubChunkAt(neededPos[i].x, neededPos[i].y, neededPos[i].z, registry);
                 if (nID != 0 && registry.hasComponent<SubChunkComponent>(nID)) {
-                    threadLocalChunks.push_back(registry.getComponent<SubChunkComponent>(nID));
+                    auto& neighbor = registry.getComponent<SubChunkComponent>(nID);
+                    if (neighbor.solidBlockCount > 0) {
+                        threadLocalChunks.push_back(neighbor);
+                    }
                 }
             }
         }
