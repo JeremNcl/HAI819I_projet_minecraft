@@ -1,5 +1,6 @@
 #include "chunkMeshingSystem.hpp"
 #include <algorithm>
+#include "engine/render/BlockTextureManager.hpp"
 
 VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const {
     if (x >= 0 && x < 16 && y >= 0 && y < 16 && z >= 0 && z < 16) {
@@ -33,17 +34,6 @@ VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData,
     return VoxelType::AIR;
 }
 
-static float getTextureIndex(VoxelType type, int axis, bool isPositive) {
-    switch (type) {
-        case VoxelType::STONE: return 3.0f;
-        case VoxelType::DIRT:  return 0.0f;
-        case VoxelType::GRASS:
-            if (axis == 1 && isPositive) return 1.0f;
-            if (axis == 1 && !isPositive) return 0.0f;
-            return 2.0f;
-        default: return 0.0f;
-    }
-}
 
 void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
                                   std::vector<GLuint>& indices,
@@ -86,13 +76,35 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
     indices.push_back(baseIdx + 3);
 }
 
-void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
-                                      SubChunkComponent& voxelData,
-                                      MeshComponent& mesh,
-                                      const subChunkCache& cache) {
-    std::vector<Vertex> vertices;
-    std::vector<GLuint> indices;
+bool ChunkMeshingSystem::isMeshingComplete(Registry& registry) const {
+    auto view = registry.view<SubChunkComponent>();
+    
+    for (EntityID entity : view) {
+        if (registry.getComponent<SubChunkComponent>(entity).meshDirty) {
+            return false;
+        }
+    }
+    
+    return true;
+}
 
+int ChunkMeshingSystem::getCompletedMeshCount(Registry& registry) const {
+    auto view = registry.view<SubChunkComponent>();
+    int completed = 0;
+    
+    for (EntityID entity : view) {
+        if (!registry.getComponent<SubChunkComponent>(entity).meshDirty) {
+            completed++;
+        }
+    }
+    return completed;
+}
+
+
+MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID entity,
+                                      SubChunkComponent& voxelData,
+                                      const subChunkCache& cache) {
+    MeshData result;
     int dims[3] = {SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z};
 
     glm::vec3 worldOffset(
@@ -100,6 +112,7 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
         voxelData.subChunkPosition.y * 16.0f,
         voxelData.subChunkPosition.z * 16.0f
     );
+
 
     for (int axis = 0; axis < 3; ++axis) {
         int u = (axis + 1) % 3;
@@ -172,13 +185,13 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                             glm::vec3 edge1(du[0], du[1], du[2]);
                             glm::vec3 edge2(dv[0], dv[1], dv[2]);
 
-                            float texIndex = getTextureIndex(type, axis, isPositive);
+                            float texIndex = static_cast<float>(BlockTextureManager::getTextureSliceIndex(type, axis, isPositive));
 
                             glm::vec3 calculatedNormal = glm::normalize(glm::cross(edge1, edge2));
                             if (glm::dot(calculatedNormal, normal) < 0) {
-                                addFace(vertices, indices, corner, edge2, edge1, normal, texIndex, axis, worldOffset);
+                                addFace(result.vertices, result.indices, corner, edge2, edge1, normal, texIndex, axis, worldOffset);
                             } else {
-                                addFace(vertices, indices, corner, edge1, edge2, normal, texIndex, axis, worldOffset);
+                                addFace(result.vertices, result.indices, corner, edge1, edge2, normal, texIndex, axis, worldOffset);
                             }
 
                             for (int l = 0; l < h; ++l) {
@@ -195,9 +208,13 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
             }
         }
     }
+    return result; 
+}
 
+
+void ChunkMeshingSystem::uploadMeshToGPU(MeshComponent& mesh, const MeshData& data) {
     mesh.cleanup();
-    if (vertices.empty()) {
+    if (data.vertices.empty()) {
         mesh.indexCount = 0;
         return;
     }
@@ -207,90 +224,39 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
 
     glGenBuffers(1, &mesh.VBO);
     glBindBuffer(GL_ARRAY_BUFFER, mesh.VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, data.vertices.size() * sizeof(Vertex), data.vertices.data(), GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);  
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
-
     glEnableVertexAttribArray(1);  
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
-
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoords));
 
     glGenBuffers(1, &mesh.IBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.IBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.indices.size() * sizeof(GLuint), data.indices.data(), GL_STATIC_DRAW);
 
-    mesh.indexCount = indices.size();
+    mesh.indexCount = data.indices.size();
     glBindVertexArray(0);
 }
 
 void ChunkMeshingSystem::update(Registry& registry) {
-    auto view = registry.view<SubChunkComponent, MeshComponent>();
-
-    bool needsMeshing = false;
-    for (EntityID entity : view) {
-        if (registry.getComponent<SubChunkComponent>(entity).meshDirty) {
-            needsMeshing = true;
-            break;
-        }
-    }
+    std::lock_guard<std::mutex> lock(uploadMutex);
     
-    if (!needsMeshing) return; 
+    int uploadsThisFrame = 0;
+    while (!uploadQueue.empty() && uploadsThisFrame < 150) {
+        MeshResult result = uploadQueue.front();
+        uploadQueue.pop();
 
-    subChunkCache cache;
-    cache.reserve(5000);
-    
-    for (EntityID entity : view) {
-        cache.push_back(&registry.getComponent<SubChunkComponent>(entity));
-    }
-
-    std::sort(cache.begin(), cache.end(), [](const SubChunkComponent* a, const SubChunkComponent* b) {
-        if (a->subChunkPosition.x != b->subChunkPosition.x) return a->subChunkPosition.x < b->subChunkPosition.x;
-        if (a->subChunkPosition.y != b->subChunkPosition.y) return a->subChunkPosition.y < b->subChunkPosition.y;
-        return a->subChunkPosition.z < b->subChunkPosition.z;
-    });
-
-    int meshesThisFrame = 0;
-    const int MAX_MESHES_PER_FRAME = 8;
-
-    for (EntityID entity : view) {
-        auto& voxelData = registry.getComponent<SubChunkComponent>(entity);
-
-        if (voxelData.meshDirty) {
-            auto& mesh = registry.getComponent<MeshComponent>(entity);
-            generateMesh(registry, entity, voxelData, mesh, cache);
-            voxelData.meshDirty = false;
+        if (registry.hasComponent<MeshComponent>(result.entity)) {
+            auto& mesh = registry.getComponent<MeshComponent>(result.entity);
+            uploadMeshToGPU(mesh, result.data);
             
-            meshesThisFrame++;
-            if (meshesThisFrame >= MAX_MESHES_PER_FRAME) {
-                break;
+            if (registry.hasComponent<SubChunkComponent>(result.entity)) {
+                registry.getComponent<SubChunkComponent>(result.entity).meshDirty = false;
             }
         }
+        uploadsThisFrame++;
     }
-}
-
-bool ChunkMeshingSystem::isMeshingComplete(Registry& registry) const {
-    auto view = registry.view<SubChunkComponent>();
-    
-    for (EntityID entity : view) {
-        if (registry.getComponent<SubChunkComponent>(entity).meshDirty) {
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-int ChunkMeshingSystem::getCompletedMeshCount(Registry& registry) const {
-    auto view = registry.view<SubChunkComponent>();
-    int completed = 0;
-    
-    for (EntityID entity : view) {
-        if (!registry.getComponent<SubChunkComponent>(entity).meshDirty) {
-            completed++;
-        }
-    }
-    return completed;
 }

@@ -9,15 +9,20 @@
 #include <map>
 #include <utility>
 #include <cmath>
+#include <queue>
+#include <mutex>
+#include <set>
 
 class TerrainSystem {
 private:
     ChunkWorker m_worker;
+    std::set<EntityID> meshingQueue;
+    std::mutex queueMutex;
     
     std::map<std::pair<int, int>, EntityID> activeChunks;
     
-    int renderDistance = 8;
-    int unloadDistance = 12;
+    int renderDistance = 14;
+    int unloadDistance = 18;
 
     void destroyChunkRecursive(Registry& registry, EntityID parentEntity) {
         if (registry.hasComponent<ChunkComponent>(parentEntity)) {
@@ -37,6 +42,11 @@ private:
         registry.destroyEntity(parentEntity);
     }
 
+    void requestMesh(EntityID id) {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        meshingQueue.insert(id);
+    }
+
 public:
     TerrainSystem(const TerrainConfig& config) : m_worker(config) {}
 
@@ -48,6 +58,14 @@ public:
             }
         }
         return count;
+    }
+
+    bool popMeshingTask(EntityID& outID) {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        if (meshingQueue.empty()) return false;
+        outID = *meshingQueue.begin(); 
+        meshingQueue.erase(meshingQueue.begin());
+        return true;
     }
 
     void update(Registry& registry) {
@@ -105,6 +123,7 @@ public:
                 for (int subY = 0; subY < 16; ++subY){
                     EntityID subChunkEntity = registry.createEntity();
                     SubChunkComponent subChunk(glm::ivec3(result.x, subY, result.z));
+                    int solidCount = 0;
 
                     for (int y = 0; y < 16; ++y) {
                         for (int z = 0; z < 16; ++z) {
@@ -113,11 +132,28 @@ public:
                                 BlockType genBlock = result.data[subY][localIdx];
 
                                 VoxelType t = VoxelType::AIR;
-                                if (genBlock == BlockType::STONE) t = VoxelType::STONE;
-                                else if (genBlock == BlockType::DIRT) t = VoxelType::DIRT;
-                                else if (genBlock == BlockType::GRASS) t = VoxelType::GRASS;
                                 
-                                subChunk.setVoxel(x, y, z, t);
+                                switch(genBlock) {
+                                    case BlockType::STONE:   t = VoxelType::STONE; break;
+                                    case BlockType::DIRT:    t = VoxelType::DIRT; break;
+                                    case BlockType::GRASS:   t = VoxelType::GRASS; break;
+                                    case BlockType::WOOD:    t = VoxelType::WOOD; break;
+                                    case BlockType::LEAVES:  t = VoxelType::LEAVES; break;
+                                    case BlockType::BEDROCK: t = VoxelType::BEDROCK; break;
+                                    case BlockType::COAL:    t = VoxelType::COAL; break;
+                                    case BlockType::IRON:    t = VoxelType::IRON; break;
+                                    case BlockType::GOLD:    t = VoxelType::GOLD; break;
+                                    case BlockType::DIAMOND: t = VoxelType::DIAMOND; break;
+                                    case BlockType::LAVA:    t = VoxelType::LAVA; break;
+                                    case BlockType::SAND:    t = VoxelType::SAND; break;
+                                    case BlockType::WATER:   t = VoxelType::WATER; break;
+                                    default:                 t = VoxelType::AIR; break;
+                                }
+                                
+                                if (t != VoxelType::AIR) {
+                                    subChunk.setVoxel(x, y, z, t);
+                                    solidCount++;
+                                }
                             }
                         }
                     }
@@ -128,6 +164,12 @@ public:
                     registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f,0.0f,0.0f)));
                     
                     chunkManager.subChunks[subY] = subChunkEntity;
+                    if (solidCount > 0) {
+                        registry.getComponent<SubChunkComponent>(subChunkEntity).meshDirty = true;
+                        requestMesh(subChunkEntity);
+                    } else {
+                        registry.getComponent<SubChunkComponent>(subChunkEntity).meshDirty = false;
+                    }
                 }
 
                 chunkManager.isFullyGenerated = true;
@@ -144,7 +186,13 @@ public:
                             auto& neighborChunk = registry.getComponent<ChunkComponent>(neighborParent);
                             for (EntityID subID : neighborChunk.subChunks) {
                                 if (subID != 0 && registry.hasComponent<SubChunkComponent>(subID)) {
-                                    registry.getComponent<SubChunkComponent>(subID).meshDirty = true;
+                                    
+                                    auto& neighborSub = registry.getComponent<SubChunkComponent>(subID);
+                                    
+                                    if (neighborSub.solidBlockCount > 0 && !neighborSub.meshDirty) {
+                                        neighborSub.meshDirty = true;
+                                        requestMesh(subID);
+                                    }
                                 }
                             }
                         }
@@ -152,5 +200,19 @@ public:
                 }
             }
         }
+        
+    }
+
+    EntityID getSubChunkAt(int x, int y, int z, Registry& registry) {
+        if (y < 0 || y > 15) return 0;
+        
+        auto it = activeChunks.find({x, z});
+        if (it != activeChunks.end()) {
+            EntityID parent = it->second;
+            if (parent != 0 && registry.hasComponent<ChunkComponent>(parent)) {
+                return registry.getComponent<ChunkComponent>(parent).subChunks[y];
+            }
+        }
+        return 0;
     }
 };

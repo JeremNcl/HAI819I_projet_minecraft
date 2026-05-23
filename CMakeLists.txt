@@ -49,8 +49,8 @@ add_definitions(
 
 # === MAGIE CMAKE ===
 # Récupération automatique de tous les fichiers .cpp et .hpp dans le dossier src/ et ses sous-dossiers
-file(GLOB_RECURSE SOURCES "src/*.cpp")
-file(GLOB_RECURSE HEADERS "src/*.hpp" "src/*.h")
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
+file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS "src/*.hpp" "src/*.h")
 
 # ImGui sources
 set(IMGUI_SOURCES

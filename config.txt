@@ -1,16 +1,19 @@
 seed = 200
 
+# Fréquence modérée pour des collines de taille "normale" (ni trop larges, ni trop serrées)
 terrain_freq = 0.005
-cave_freq = 0.07
-biome_freq = 0.002
+cave_freq = 0.04
+biome_freq = 0.004
 
-# Hauteurs par Biome
-height_mountain = 80
-height_plains = 60
-height_desert = 50
-height_ocean = 30
-amplitude = 30.0
+# Hauteurs par Biome (L'écart est beaucoup moins violent)
+height_mountain = 95
+height_plains = 65
+height_desert = 65
+height_ocean = 45
+
+# L'amplitude est divisée par presque 3 pour adoucir toutes les pentes !
+amplitude = 18.0
 
 # Grottes et Arbres
-cave_threshold = -0.4
-tree_chance = 10
+cave_threshold = -0.3
+tree_chance = 2

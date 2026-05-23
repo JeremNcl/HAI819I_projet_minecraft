@@ -24,14 +24,36 @@ GLuint loadTextureArray(const std::vector<std::string>& filepaths) {
 
 	for (int i = 0; i < layoutCount; ++i){
 		int w, h, channels;
+		if (filepaths[i].empty()) {
+			std::vector<unsigned char> fallback(width * height * 4);
+			for (int px = 0; px < width * height; ++px) {
+				fallback[px * 4 + 0] = 255;
+				fallback[px * 4 + 1] = 0;
+				fallback[px * 4 + 2] = 255;
+				fallback[px * 4 + 3] = 255;
+			}
+			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, fallback.data());
+			continue;
+		}
+
 		unsigned char* data = stbi_load(filepaths[i].c_str(),&w, &h ,&channels, 4);
 		if (data){
 			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0,0,0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
 			stbi_image_free(data);
 		} else {
-            std::cerr << "ERREUR : Impossible de charger la texture : " << filepaths[i] << std::endl;
-        }
+			std::cerr << "ERREUR : Impossible de charger la texture : " << filepaths[i] << std::endl;
+			std::vector<unsigned char> fallback(width * height * 4);
+			for (int px = 0; px < width * height; ++px) {
+				fallback[px * 4 + 0] = 255;
+				fallback[px * 4 + 1] = 0;
+				fallback[px * 4 + 2] = 255;
+				fallback[px * 4 + 3] = 255;
+			}
+			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, fallback.data());
+		}
 	}
+
+	// Note: les erreurs de chargement ont déjà été loguées pour chaque fichier non trouvé.
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
@@ -253,3 +275,48 @@ GLuint loadDDS(const char * imagepath){
 
 
 }
+
+GLuint loadImageAsTexture2D(const char* imagepath) {
+    if (!imagepath) return 0;
+
+    int width, height, channels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load(imagepath, &width, &height, &channels, 4);
+
+    if (!data) {
+        std::cerr << "Failed to load texture: " << imagepath << std::endl;
+        return 0;
+    }
+
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+    stbi_image_free(data);
+
+    return textureID;
+}
+
+BlockTextures loadBlockTextures(const char* colorPath, 
+                                 const char* normalPath, 
+                                 const char* metallicPath) {
+    BlockTextures result;
+    result.colorMap = loadImageAsTexture2D(colorPath);
+    result.normalMap = loadImageAsTexture2D(normalPath);
+    result.metallicMap = loadImageAsTexture2D(metallicPath);
+
+    if (result.colorMap == 0 || result.normalMap == 0 || result.metallicMap == 0) {
+        std::cerr << "Warning: Failed to load one or more block textures" << std::endl;
+    }
+
+    return result;
+}
+

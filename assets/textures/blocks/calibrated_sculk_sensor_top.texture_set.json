@@ -1,8 +1,0 @@
-{
-  "format_version": "1.16.100",
-  "minecraft:texture_set": {
-    "color": "calibrated_sculk_sensor_top",
-    "metalness_emissive_roughness": "roughness125_mer",
-    "normal": "calibrated_sculk_sensor_top_normal"
-  }
-}
