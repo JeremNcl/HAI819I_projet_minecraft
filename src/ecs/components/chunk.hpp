@@ -36,6 +36,8 @@ struct SubChunkComponent : public Component {
     glm::ivec3 subChunkPosition = glm::ivec3(0);
     bool meshDirty = true;
 
+    int solidBlockCount = 0;
+
     SubChunkComponent() : voxels(SUBVOXEL_ARRAY_SIZE, 0) {}
 
     explicit SubChunkComponent(const glm::ivec3& pos)
@@ -59,6 +61,11 @@ struct SubChunkComponent : public Component {
     inline void setVoxel(int x, int y, int z, VoxelType type) {
         size_t idx = getIndex(x, y, z);
         if (idx < SUBVOXEL_ARRAY_SIZE) {
+            
+            VoxelType oldType = static_cast<VoxelType>(voxels[idx]);
+            if (oldType == VoxelType::AIR && type != VoxelType::AIR) solidBlockCount++;
+            else if (oldType != VoxelType::AIR && type == VoxelType::AIR) solidBlockCount--;
+
             voxels[idx] = static_cast<uint8_t>(type);
         }
     }

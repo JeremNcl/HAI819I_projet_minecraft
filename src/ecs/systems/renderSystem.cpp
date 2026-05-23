@@ -1,8 +1,23 @@
 #include "renderSystem.hpp"
 #include "../components/camera.hpp"
 #include <GL/glew.h>
+#include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#include <unordered_map>
+#include <unordered_set>
+#include <queue>
+
+#ifndef GLM_VEC3_HASH_DEFINED
+#define GLM_VEC3_HASH_DEFINED
+struct GLMVec3Hash {
+    std::size_t operator()(const glm::ivec3& k) const {
+        return std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1) ^ (std::hash<int>()(k.z) << 2);
+    }
+};
+#endif
+
 
 void RenderSystem::extractFrustumPlanes(const glm::mat4& vp, std::array<glm::vec4, 6>& planes) {
     planes[0] = glm::vec4(vp[0][3] + vp[0][0], vp[1][3] + vp[1][0], vp[2][3] + vp[2][0], vp[3][3] + vp[3][0]);
@@ -84,33 +99,47 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram) {
     GLint locMVP = glGetUniformLocation(shaderProgram, "MVP");
     
     glm::mat4 vpMatrix = camera->projectionMatrix * camera->viewMatrix;
-    
     glUniformMatrix4fv(locMVP, 1, GL_FALSE, glm::value_ptr(vpMatrix));
 
     std::array<glm::vec4, 6> frustumPlanes;
     extractFrustumPlanes(vpMatrix, frustumPlanes);
 
+    struct RenderNode {
+        EntityID entity;
+        float distanceSq;
+        const MeshComponent* mesh;
+    };
+    std::vector<RenderNode> visibleChunks;
+    visibleChunks.reserve(2000);
+
+    glm::vec3 camPos = registry.getComponent<TransformComponent>(lastActiveCamera).position;
+
     for (EntityID entity : view) {
         const auto& mesh = registry.getComponent<MeshComponent>(entity);
-        
         if (mesh.indexCount == 0 || mesh.VAO == 0) continue;
 
-        if (registry.hasComponent<SubChunkComponent>(entity)) {
-            const auto& subChunk = registry.getComponent<SubChunkComponent>(entity);
-
-            glm::vec3 minBounds = glm::vec3(subChunk.subChunkPosition) * 16.0f;
-            glm::vec3 maxBounds = minBounds + glm::vec3(16.0f, 16.0f, 16.0f);
-
-            if (!isAABBInFrustum(minBounds, maxBounds, frustumPlanes)){
-                continue;
-            }
-        }
+        const auto& transform = registry.getComponent<TransformComponent>(entity);
+        const auto& subChunk = registry.getComponent<SubChunkComponent>(entity);
         
-        glBindVertexArray(mesh.VAO);
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mesh.indexCount), GL_UNSIGNED_INT, nullptr);
+        glm::vec3 minBounds = (glm::vec3(subChunk.subChunkPosition) * 16.0f) + transform.position;
+        glm::vec3 maxBounds = minBounds + glm::vec3(16.0f, 16.0f, 16.0f);
+        
+        if (!isAABBInFrustum(minBounds, maxBounds, frustumPlanes)) continue;
+
+        glm::vec3 diff = camPos - ((minBounds + maxBounds) * 0.5f);
+        visibleChunks.push_back({entity, glm::dot(diff, diff), &mesh});
+    }
+
+    std::sort(visibleChunks.begin(), visibleChunks.end(), [](const RenderNode& a, const RenderNode& b) {
+        return a.distanceSq < b.distanceSq; 
+    });
+
+    // 3. RENDU BATCHÉ
+    for (const auto& node : visibleChunks) {
+        glBindVertexArray(node.mesh->VAO);
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(node.mesh->indexCount), GL_UNSIGNED_INT, nullptr);
     }
     
     glBindVertexArray(0);
     glUseProgram(0);
 }
-

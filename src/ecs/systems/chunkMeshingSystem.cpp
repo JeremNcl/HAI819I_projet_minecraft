@@ -132,9 +132,7 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
         voxelData.subChunkPosition.z * 16.0f
     );
 
-    // ... COPIE ICI TOUTES TES BOUCLES FOR (axis, dir, x, y, z...) DE TON ANCIEN generateMesh ...
-    // ATTENTION : Remplace "vertices" et "indices" par "result.vertices" et "result.indices" 
-    // dans tes appels à addFace !
+
     for (int axis = 0; axis < 3; ++axis) {
         int u = (axis + 1) % 3;
         int v = (axis + 2) % 3;
