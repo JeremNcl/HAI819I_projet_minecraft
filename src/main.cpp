@@ -158,7 +158,7 @@ int main( void ) {
 
     EntityID camEntity = registry.createEntity();
     registry.addComponent(camEntity, TransformComponent{
-        glm::vec3(45,50,-55),
+        glm::vec3(45,120,-55),
         glm::vec3(0,0,0)
     });
     registry.addComponent(camEntity, CameraComponent{ .isActive = true});
@@ -179,15 +179,23 @@ int main( void ) {
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     std::vector<std::string> textureFiles = {
-        "assets/textures/blocks/dirt.png",
-        "assets/textures/blocks/grass_path_top.png",
-        "assets/textures/blocks/grass_path_side.png",
-        "assets/textures/blocks/stone.png"
+        "assets/textures/blocks/dirt.png",            // 0: Dirt
+        "assets/textures/blocks/grass_path_top.png",  // 1: Herbe Top (Haut)
+        "assets/textures/blocks/grass_path_side.png", // 2: Herbe Coté
+        "assets/textures/blocks/stone.png",           // 3: Stone
+        "assets/textures/blocks/log_oak.png",         // 4: Wood (Écorce / Côtés de l'arbre)
+        "assets/textures/blocks/log_oak_top.png",     // 5: Wood Top (Haut/Bas du tronc coupé)
+        "assets/textures/blocks/leaves_oak.png",      // 6: Feuille de chêne
+        "assets/textures/blocks/bedrock.png",         // 7: BedRock
+        "assets/textures/blocks/coal_ore.png",        // 8: Minerai de Charbon
+        "assets/textures/blocks/iron_ore.png",        // 9: Minerai de Fer
+        "assets/textures/blocks/gold_ore.png",        // 10: Minerai d'Or
+        "assets/textures/blocks/diamond_ore.png"      // 11: Minerai de Diamant
     };
     GLuint textureArrayID = loadTextureArray(textureFiles);
 
     bool isLoading = true;
-    const int TARGET_CHUNKS = 289;
+    const int TARGET_CHUNKS = 29*29; // (Rayon  * 2 + 1)^2 rayon = 14
 
     unsigned int numThreads = std::thread::hardware_concurrency();
     if (numThreads == 0) numThreads = 4; // Sécurité
@@ -216,10 +224,11 @@ int main( void ) {
             meshingSystem.update(registry);
         }
 
-        if (isLoading && terrainSystem.getLoadedChunksCount() >= TARGET_CHUNKS) {
-            if (meshingSystem.isMeshingComplete(registry)) {
-                isLoading = false;
-            }
+        int totalExpectedMeshes = TARGET_CHUNKS * 16;
+        int currentMeshesReady = meshingSystem.getCompletedMeshCount(registry);
+
+        if (isLoading && currentMeshesReady >= totalExpectedMeshes) {
+            isLoading = false;
         }
 
         if (isLoading) {
@@ -239,9 +248,6 @@ int main( void ) {
             ImGui::SetNextWindowSize(current_io.DisplaySize);
             ImGui::Begin("LoadingScreen", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
 
-            // --- CALCULS DU MAILLAGE ---
-            int totalExpectedMeshes = TARGET_CHUNKS * 16; // 16 sous-chunks verticaux par chunk
-            int currentMeshesReady = meshingSystem.getCompletedMeshCount(registry);
             float progress = (float)currentMeshesReady / totalExpectedMeshes;
             // ----------------------------
 

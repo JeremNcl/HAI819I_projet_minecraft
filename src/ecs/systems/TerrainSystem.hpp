@@ -21,8 +21,8 @@ private:
     
     std::map<std::pair<int, int>, EntityID> activeChunks;
     
-    int renderDistance = 8;
-    int unloadDistance = 12;
+    int renderDistance = 14;
+    int unloadDistance = 18;
 
     void destroyChunkRecursive(Registry& registry, EntityID parentEntity) {
         if (registry.hasComponent<ChunkComponent>(parentEntity)) {
@@ -131,9 +131,23 @@ public:
                                 BlockType genBlock = result.data[subY][localIdx];
 
                                 VoxelType t = VoxelType::AIR;
-                                if (genBlock == BlockType::STONE) t = VoxelType::STONE;
-                                else if (genBlock == BlockType::DIRT) t = VoxelType::DIRT;
-                                else if (genBlock == BlockType::GRASS) t = VoxelType::GRASS;
+                                
+                                switch(genBlock) {
+                                    case BlockType::STONE:   t = VoxelType::STONE; break;
+                                    case BlockType::DIRT:    t = VoxelType::DIRT; break;
+                                    case BlockType::GRASS:   t = VoxelType::GRASS; break;
+                                    case BlockType::WOOD:    t = VoxelType::WOOD; break;
+                                    case BlockType::LEAVES:  t = VoxelType::LEAVES; break;
+                                    case BlockType::BEDROCK: t = VoxelType::BEDROCK; break;
+                                    case BlockType::COAL:    t = VoxelType::COAL; break;
+                                    case BlockType::IRON:    t = VoxelType::IRON; break;
+                                    case BlockType::GOLD:    t = VoxelType::GOLD; break;
+                                    case BlockType::DIAMOND: t = VoxelType::DIAMOND; break;
+                                    case BlockType::LAVA:    t = VoxelType::LAVA; break;
+                                    case BlockType::SAND:    t = VoxelType::SAND; break;
+                                    case BlockType::WATER:   t = VoxelType::WATER; break;
+                                    default:                 t = VoxelType::AIR; break;
+                                }
                                 
                                 subChunk.setVoxel(x, y, z, t);
                             }

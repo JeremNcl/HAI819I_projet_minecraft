@@ -35,12 +35,21 @@ VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData,
 
 static float getTextureIndex(VoxelType type, int axis, bool isPositive) {
     switch (type) {
-        case VoxelType::STONE: return 3.0f;
-        case VoxelType::DIRT:  return 0.0f;
+        case VoxelType::DIRT:    return 0.0f;
         case VoxelType::GRASS:
             if (axis == 1 && isPositive) return 1.0f;
             if (axis == 1 && !isPositive) return 0.0f;
             return 2.0f;
+        case VoxelType::STONE:   return 3.0f;
+        case VoxelType::WOOD:    
+            if (axis == 1) return 5.0f;
+            return 4.0f;
+        case VoxelType::LEAVES:  return 6.0f;
+        case VoxelType::BEDROCK: return 7.0f;
+        case VoxelType::COAL:    return 8.0f;
+        case VoxelType::IRON:    return 9.0f;
+        case VoxelType::GOLD:    return 10.0f;
+        case VoxelType::DIAMOND: return 11.0f;
         default: return 0.0f;
     }
 }

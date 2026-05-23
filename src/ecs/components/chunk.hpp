@@ -18,7 +18,17 @@ enum class VoxelType : uint8_t {
     AIR = 0,
     STONE = 1,
     DIRT = 2,
-    GRASS = 3
+    GRASS = 3,
+    WOOD = 4,
+    LEAVES = 5,
+    BEDROCK = 6,
+    COAL = 7,
+    IRON = 8,
+    GOLD = 9,
+    DIAMOND = 10,
+    LAVA = 11,
+    SAND = 12,
+    WATER = 13
 };
 
 struct SubChunkComponent : public Component {
