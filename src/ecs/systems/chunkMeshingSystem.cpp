@@ -11,10 +11,7 @@ static float getTextureIndex(VoxelType type, int axis, bool isPositive) {
     switch (type) {
         case VoxelType::STONE: return 0.0f; // Index 0 dans le Texture Array
         case VoxelType::DIRT:  return 1.0f; // Index 1 dans le Texture Array
-        case VoxelType::GRASS:
-            if (axis == 1 && isPositive) return 2.0f; // Haut (Herbe)
-            if (axis == 1 && !isPositive) return 1.0f; // Bas (Terre)
-            return 3.0f; // Côtés (Herbe côté)
+        case VoxelType::GRASS: return 2.0f; // Herbe pleine (2)
         default: return 0.0f;
     }
 }

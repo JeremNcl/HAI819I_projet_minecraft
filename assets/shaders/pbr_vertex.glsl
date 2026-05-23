@@ -4,7 +4,7 @@
 layout(location = 0) in vec3 vertices_position_modelspace;
 layout(location = 1) in vec3 vertices_normal;
 layout(location = 2) in vec3 vertices_uv;
-// layout(location = 3) in vec3 vertices_tangent;
+layout(location = 3) in vec3 vertices_tangent;
 // layout(location = 4) in vec3 vertices_bitangent;
 
 // === OUTPUT TO FRAGMENT SHADER ===
@@ -32,22 +32,16 @@ void main(){
     vs_out.Normal = normalize(normalMatrix * vertices_normal);
     
     // Compute TBN matrix for normal mapping
-    // vec3 T = normalize(normalMatrix * vertices_tangent);
-    // vec3 B = normalize(normalMatrix * vertices_bitangent);
     vec3 N = vs_out.Normal;
     
-    // Re-orthogonalize B with respect to N (Gram-Schmidt)
-    // B = normalize(B - dot(B, N) * N);
-    // T = cross(N, B);
-
-    // Génération procédurale d'une tangente valide pour les voxels
-    vec3 T;
-    if (abs(N.y) > 0.9) {
-        T = normalize(normalMatrix * vec3(1.0, 0.0, 0.0));
-    } else {
-        T = normalize(normalMatrix * cross(vec3(0.0, 1.0, 0.0), vertices_normal));
-    }
-    vec3 B = normalize(cross(N, T));
+    // On utilise la tangente fournie par le Meshing System
+    vec3 T = normalize(normalMatrix * vertices_tangent);
+    
+    // Gram-Schmidt (Optionnel mais sécurisant pour garantir un angle de 90°)
+    T = normalize(T - dot(T, N) * N);
+    
+    // On déduit la Bitangente (avec le bon sens, si l'éclairage est bizarre, on fera T = cross(T, N))
+    vec3 B = cross(N, T);
     
     vs_out.TBN = mat3(T, B, N);
     

@@ -69,6 +69,16 @@ void main() {
     vec3 albedo = texture(colorMap, uvw).rgb;
     vec3 normal = texture(normalMap, uvw).rgb;
     vec3 metallicSample = texture(metallicMap, uvw).rgb;
+
+    // On applique le colorant de biome AVANT la correction Gamma
+    if (uvw.z >= 1.9) {
+        // Vrai vert Minecraft (sRGB : 124, 189, 75)
+        vec3 biomeColor = vec3(124.0/255.0, 189.0/255.0, 75.0/255.0);
+        albedo *= biomeColor;
+    }
+
+    // Correction de l'albedo (sRGB to Linear)
+    albedo = pow(albedo, vec3(2.2));
     
     // Convert normal map from [0,1] to [-1,1]
     normal = normalize(normal * 2.0 - 1.0);
