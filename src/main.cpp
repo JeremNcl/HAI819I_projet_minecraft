@@ -162,10 +162,10 @@ int main( void ) {
     // Initialisation de la caméra (Mode Libre par défaut)
     Camera camera;
     camera.initialize(
-        glm::vec3(8.0f, 20.0f, 8.0f),   // Position initiale en hauteur
-        glm::vec3(8.0f, 0.0f, -8.0f),   // Regarde vers le bas
-        glm::vec3(0.0f, 1.0f, 0.0f),    // Vecteur Up
-        15.0f                           // Vitesse
+        glm::vec3(85.0f, 85.0f, 85.0f),   // Position initiale
+        glm::vec3(85.0f, 60.0f, 50.0f),   // Regarde vers le centre du monde
+        glm::vec3(0.0f, 1.0f, 0.0f),      // Vecteur Up
+        15.0f                             // Vitesse
     );
     camera.setMode(FREE_CAMERA, window);
 

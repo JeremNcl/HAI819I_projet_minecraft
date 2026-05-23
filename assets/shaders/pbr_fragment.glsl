@@ -87,12 +87,17 @@ void main() {
     
     // DECODAGE FORMAT BEDROCK RTX (MER) :
     // R = Metallic, G = Emission, B = Roughness
-    float metallic = metallicSample.r;
+    
+    // Forçons un seuil très bas pour le métal pour éviter les points noirs de la dirt et autres matériaux non métalliques
+    float metallic = metallicSample.r > 0.5 ? 1.0 : 0.0;
+    
     float emission = metallicSample.g;
+    
+    // On lit la Roughness directement, SANS l'inverser (Standard Vanilla RTX strict)
     float roughness = metallicSample.b;
     
     // Clamp roughness to avoid artifacts
-    roughness = max(roughness, 0.04);
+    roughness = clamp(roughness, 0.05, 1.0);
     
     // View direction
     vec3 V = normalize(viewPos - fs_in.FragPos);
