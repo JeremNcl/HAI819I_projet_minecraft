@@ -1,29 +1,22 @@
 #pragma once
 
-#include "../io/textureLoader.hpp"
-#include <vector>
-#include <string>
+#include "engine/io/textureLoader.hpp"
+#include "engine/render/BlockDefinitionRegistry.hpp"
 #include <GL/glew.h>
-
-// L'ordre ici définit l'index (Z) dans le Texture Array
-// 0 = STONE, 1 = DIRT, 2 = GRASS
-enum class MaterialType {
-    STONE = 0,
-    DIRT = 1,
-    GRASS = 2,
-    COUNT // Permet de connaître le nombre de matériaux
-};
 
 class BlockTextureManager {
 private:
     static GLuint colorArrayID;
     static GLuint normalArrayID;
     static GLuint metallicArrayID;
+    static int sliceCount;
 
 public:
     static void initialize();
     static void bindArrays(GLuint shaderProgram);
     static void cleanup();
+    // Délègue le mapping voxel/face au registre de définitions.
+    static int getTextureSliceIndex(VoxelType type, int axis, bool isPositive);
     
     static GLuint getColorArrayID() { return colorArrayID; }
     static GLuint getNormalArrayID() { return normalArrayID; }

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <array>
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -59,6 +60,16 @@ float lastFrame = 0.0f;
 
 // Debug flags
 bool debugWireframe = false;
+bool usePbrShader = true;
+bool debugTBN = false;
+
+static bool keyPressedOnce(GLFWwindow* _window, int key) {
+    static std::array<bool, GLFW_KEY_LAST + 1> previousState{};
+    bool isPressed = (glfwGetKey(_window, key) == GLFW_PRESS);
+    bool triggered = isPressed && !previousState[key];
+    previousState[key] = isPressed;
+    return triggered;
+}
 
 std::mutex ecsMutex;
 std::atomic<bool> isGameRunning{true};
@@ -185,22 +196,6 @@ int main( void ) {
     printf("Contrôles: ZQSD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation\n");
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
-    std::vector<std::string> textureFiles = {
-        "assets/textures/blocks/dirt.png",            // 0: Dirt
-        "assets/textures/blocks/grass_path_top.png",  // 1: Herbe Top (Haut)
-        "assets/textures/blocks/grass_path_side.png", // 2: Herbe Coté
-        "assets/textures/blocks/stone.png",           // 3: Stone
-        "assets/textures/blocks/log_oak.png",         // 4: Wood (Écorce / Côtés de l'arbre)
-        "assets/textures/blocks/log_oak_top.png",     // 5: Wood Top (Haut/Bas du tronc coupé)
-        "assets/textures/blocks/leaves_oak.png",      // 6: Feuille de chêne
-        "assets/textures/blocks/bedrock.png",         // 7: BedRock
-        "assets/textures/blocks/coal_ore.png",        // 8: Minerai de Charbon
-        "assets/textures/blocks/iron_ore.png",        // 9: Minerai de Fer
-        "assets/textures/blocks/gold_ore.png",        // 10: Minerai d'Or
-        "assets/textures/blocks/diamond_ore.png"      // 11: Minerai de Diamant
-    };
-    GLuint textureArrayID = loadTextureArray(textureFiles);
-
     bool isLoading = true;
     const int TARGET_CHUNKS = 29*29; // (Rayon  * 2 + 1)^2 rayon = 14
 
@@ -282,15 +277,31 @@ int main( void ) {
             cameraSystem.update(registry, deltaTime);
             windowSystem.update(registry, window);        
             pathFindingSystem.update(registry);
-            renderSystem.update(registry, basicProgramID);
+
+            if (keyPressedOnce(window, GLFW_KEY_F10)) {
+                usePbrShader = !usePbrShader;
+                printf("Mode rendu: %s\n", usePbrShader ? "PBR" : "BASIC");
+            }
+
+            if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F9)) {
+                debugTBN = !debugTBN;
+                printf("Debug TBN: %s\n", debugTBN ? "ON" : "OFF");
+            }
+
+            GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
+            BlockTextureManager::bindArrays(activeProgramID);
+
+            glUseProgram(activeProgramID);
+            GLint debugLoc = glGetUniformLocation(activeProgramID, "debugTBN");
+            if (debugLoc >= 0) {
+                glUniform1i(debugLoc, debugTBN ? 1 : 0);
+            }
+
+            renderSystem.update(registry, activeProgramID);
             
             if (debugWireframe) {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             }
-            
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D_ARRAY, textureArrayID);
-            glUniform1i(glGetUniformLocation(basicProgramID, "textureSampler"), 0);
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 

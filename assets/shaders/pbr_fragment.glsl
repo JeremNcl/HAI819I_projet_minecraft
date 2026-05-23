@@ -20,6 +20,7 @@ uniform sampler2DArray metallicMap;
 uniform vec3 lightPos;
 uniform vec3 lightColor;
 uniform vec3 viewPos;
+uniform bool debugTBN;
 
 // === PBR CONSTANTS ===
 const float PI = 3.14159265359;
@@ -146,14 +147,11 @@ void main() {
     // Gamma correction
     color = pow(color, vec3(1.0/2.2));
     
-    // AFFICHER LE TBN POUR DEBUG :
-    // R = Tangente (Axe X de la texture)
-    // G = Bitangente (Axe Y de la texture)
-    // B = Normale (Axe Z de la texture)
-    FragColor = vec4(normalize(fs_in.TBN[0]) * 0.5 + 0.5, 1.0); // Affiche la Tangente
-    // FragColor = vec4(normalize(fs_in.TBN[1]) * 0.5 + 0.5, 1.0); // Affiche la Bitangente
-    // FragColor = vec4(normalize(fs_in.TBN[2]) * 0.5 + 0.5, 1.0); // Affiche la Normale
-    
-    //FragColor = vec4(color, 1.0);
+    if (debugTBN) {
+        // R = Tangente, G = Bitangente, B = Normale
+        FragColor = vec4(normalize(fs_in.TBN[0]) * 0.5 + 0.5, 1.0);
+    } else {
+        FragColor = vec4(color, 1.0);
+    }
 }
 

@@ -1,5 +1,6 @@
 #include "chunkMeshingSystem.hpp"
 #include <algorithm>
+#include "engine/render/BlockTextureManager.hpp"
 
 VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const {
     if (x >= 0 && x < 16 && y >= 0 && y < 16 && z >= 0 && z < 16) {
@@ -33,26 +34,6 @@ VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData,
     return VoxelType::AIR;
 }
 
-static float getTextureIndex(VoxelType type, int axis, bool isPositive) {
-    switch (type) {
-        case VoxelType::DIRT:    return 0.0f;
-        case VoxelType::GRASS:
-            if (axis == 1 && isPositive) return 1.0f;
-            if (axis == 1 && !isPositive) return 0.0f;
-            return 2.0f;
-        case VoxelType::STONE:   return 3.0f;
-        case VoxelType::WOOD:    
-            if (axis == 1) return 5.0f;
-            return 4.0f;
-        case VoxelType::LEAVES:  return 6.0f;
-        case VoxelType::BEDROCK: return 7.0f;
-        case VoxelType::COAL:    return 8.0f;
-        case VoxelType::IRON:    return 9.0f;
-        case VoxelType::GOLD:    return 10.0f;
-        case VoxelType::DIAMOND: return 11.0f;
-        default: return 0.0f;
-    }
-}
 
 void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
                                   std::vector<GLuint>& indices,
@@ -204,7 +185,7 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
                             glm::vec3 edge1(du[0], du[1], du[2]);
                             glm::vec3 edge2(dv[0], dv[1], dv[2]);
 
-                            float texIndex = getTextureIndex(type, axis, isPositive);
+                            float texIndex = static_cast<float>(BlockTextureManager::getTextureSliceIndex(type, axis, isPositive));
 
                             glm::vec3 calculatedNormal = glm::normalize(glm::cross(edge1, edge2));
                             if (glm::dot(calculatedNormal, normal) < 0) {

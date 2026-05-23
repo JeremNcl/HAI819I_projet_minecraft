@@ -24,14 +24,36 @@ GLuint loadTextureArray(const std::vector<std::string>& filepaths) {
 
 	for (int i = 0; i < layoutCount; ++i){
 		int w, h, channels;
+		if (filepaths[i].empty()) {
+			std::vector<unsigned char> fallback(width * height * 4);
+			for (int px = 0; px < width * height; ++px) {
+				fallback[px * 4 + 0] = 255;
+				fallback[px * 4 + 1] = 0;
+				fallback[px * 4 + 2] = 255;
+				fallback[px * 4 + 3] = 255;
+			}
+			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, fallback.data());
+			continue;
+		}
+
 		unsigned char* data = stbi_load(filepaths[i].c_str(),&w, &h ,&channels, 4);
 		if (data){
 			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0,0,0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
 			stbi_image_free(data);
 		} else {
-            std::cerr << "ERREUR : Impossible de charger la texture : " << filepaths[i] << std::endl;
-        }
+			std::cerr << "ERREUR : Impossible de charger la texture : " << filepaths[i] << std::endl;
+			std::vector<unsigned char> fallback(width * height * 4);
+			for (int px = 0; px < width * height; ++px) {
+				fallback[px * 4 + 0] = 255;
+				fallback[px * 4 + 1] = 0;
+				fallback[px * 4 + 2] = 255;
+				fallback[px * 4 + 3] = 255;
+			}
+			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, fallback.data());
+		}
 	}
+
+	// Note: les erreurs de chargement ont déjà été loguées pour chaque fichier non trouvé.
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
