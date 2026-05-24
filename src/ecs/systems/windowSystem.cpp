@@ -1,6 +1,6 @@
 #include "windowSystem.hpp"
 
-void WindowSystem::update(Registry& _registry, GLFWwindow* _window){
+bool WindowSystem::update(Registry& _registry, GLFWwindow* _window){
 
     Registry::View<InputReceiverComponent> view = _registry.view<InputReceiverComponent>();
 
@@ -25,6 +25,7 @@ void WindowSystem::update(Registry& _registry, GLFWwindow* _window){
             }
 
             input.toggleFullscreen = false; 
+            return true;
         }
     }
 
@@ -43,4 +44,6 @@ void WindowSystem::update(Registry& _registry, GLFWwindow* _window){
     lastWidth = width;
     lastHeight = height;
 }
+
+    return false;
 }

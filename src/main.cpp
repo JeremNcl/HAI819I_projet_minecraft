@@ -63,6 +63,72 @@ bool debugWireframe = false;
 bool usePbrShader = true;
 bool debugTBN = false;
 
+enum class TestSceneMode {
+    SimpleSubChunk = 1,
+    GeneratedChunk = 2,
+    InfiniteTerrain = 3
+};
+
+static const char* sceneName(TestSceneMode sceneMode) {
+    switch (sceneMode) {
+        case TestSceneMode::SimpleSubChunk: return "Simple subchunk test scene";
+        case TestSceneMode::GeneratedChunk: return "Single generated chunk test scene";
+        case TestSceneMode::InfiniteTerrain: return "Infinite terrain test scene";
+    }
+    return "Unknown test scene";
+}
+
+static TestSceneMode parseSceneMode(int argc, char** argv) {
+    if (argc > 1) {
+        int value = std::atoi(argv[1]);
+        if (value == 1) return TestSceneMode::SimpleSubChunk;
+        if (value == 2) return TestSceneMode::GeneratedChunk;
+        if (value == 3) return TestSceneMode::InfiniteTerrain;
+    }
+    return TestSceneMode::InfiniteTerrain;
+}
+
+static void positionCameraForScene(Registry& registry, EntityID cameraEntity, TestSceneMode sceneMode) {
+    auto& transform = registry.getComponent<TransformComponent>(cameraEntity);
+
+    switch (sceneMode) {
+        case TestSceneMode::SimpleSubChunk:
+            transform.position = glm::vec3(8.0f, 24.0f, -24.0f);
+            break;
+        case TestSceneMode::GeneratedChunk:
+            transform.position = glm::vec3(8.0f, 40.0f, -32.0f);
+            break;
+        case TestSceneMode::InfiniteTerrain:
+            transform.position = glm::vec3(45.0f, 120.0f, -55.0f);
+            break;
+    }
+}
+
+static void buildStaticSceneMeshes(Registry& registry, ChunkMeshingSystem& meshingSystem) {
+    std::vector<EntityID> subChunkEntities;
+    subChunkCache cache;
+
+    auto view = registry.view<SubChunkComponent>();
+    for (EntityID entity : view) {
+        subChunkEntities.push_back(entity);
+        cache.push_back(&registry.getComponent<SubChunkComponent>(entity));
+    }
+
+    std::sort(cache.begin(), cache.end(), [](const SubChunkComponent* a, const SubChunkComponent* b) {
+        if (a->subChunkPosition.x != b->subChunkPosition.x) return a->subChunkPosition.x < b->subChunkPosition.x;
+        if (a->subChunkPosition.y != b->subChunkPosition.y) return a->subChunkPosition.y < b->subChunkPosition.y;
+        return a->subChunkPosition.z < b->subChunkPosition.z;
+    });
+
+    for (EntityID entity : subChunkEntities) {
+        auto& subChunk = registry.getComponent<SubChunkComponent>(entity);
+        auto& mesh = registry.getComponent<MeshComponent>(entity);
+        MeshData meshData = meshingSystem.calculateMeshData(registry, entity, subChunk, cache);
+        meshingSystem.uploadMeshToGPU(mesh, meshData);
+        subChunk.meshDirty = false;
+    }
+}
+
 static bool keyPressedOnce(GLFWwindow* _window, int key) {
     static std::array<bool, GLFW_KEY_LAST + 1> previousState{};
     bool isPressed = (glfwGetKey(_window, key) == GLFW_PRESS);
@@ -76,7 +142,7 @@ std::atomic<bool> isGameRunning{true};
 
 /*******************************************************************************/
 
-int main( void ) {
+int main(int argc, char** argv) {
     
     // Initialisation de GLFW
     if( !glfwInit() ) {
@@ -168,6 +234,12 @@ int main( void ) {
     TerrainConfig config = LoadConfig("config.txt");
     TerrainSystem terrainSystem(config);
     PathFindingSystem pathFindingSystem;
+
+    const TestSceneMode selectedScene = parseSceneMode(argc, argv);
+    const bool useInfiniteTerrain = (selectedScene == TestSceneMode::InfiniteTerrain);
+
+    printf("Scene de test activee: %s\n", sceneName(selectedScene));
+    printf("Ligne de commande: 1=simple subchunk, 2=chunk genere, 3=terrain infini\n");
     
     printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem).\n");
     printf("Caméra initialisée en mode FREE_CAMERA.\n");
@@ -183,6 +255,17 @@ int main( void ) {
     registry.addComponent(camEntity, InputReceiverComponent{});
 
     cameraSystem.initCamera(registry, camEntity, 90, 0);
+    positionCameraForScene(registry, camEntity, selectedScene);
+
+    if (selectedScene == TestSceneMode::SimpleSubChunk) {
+        TestScenes::createSimpleChunk(registry);
+        buildStaticSceneMeshes(registry, meshingSystem);
+    } else if (selectedScene == TestSceneMode::GeneratedChunk) {
+        TestScenes::createGeneratedChunk(registry);
+        buildStaticSceneMeshes(registry, meshingSystem);
+    } else {
+        TestScenes::createInfiniteTerrainScene(registry);
+    }
 
     //Setup curseur au demarrage
     inputSystem.setCursorMode(window, true);
@@ -196,17 +279,18 @@ int main( void ) {
     printf("Contrôles: ZQSD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation\n");
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
-    bool isLoading = true;
-    const int TARGET_CHUNKS = 29*29; // (Rayon  * 2 + 1)^2 rayon = 14
+    bool isLoading = useInfiniteTerrain;
+    const int TARGET_CHUNKS = useInfiniteTerrain ? 29 * 29 : 0; // (Rayon  * 2 + 1)^2 rayon = 14
 
     unsigned int numThreads = std::thread::hardware_concurrency();
     if (numThreads == 0) numThreads = 4; // Sécurité
-    
-    printf("Lancement de %d threads de maillage en parallele !\n", numThreads);
-    
+
     std::vector<std::thread> workers;
-    for (unsigned int i = 0; i < numThreads; ++i) {
-        workers.emplace_back(MeshingWorkerThread, std::ref(registry), std::ref(terrainSystem), std::ref(meshingSystem));
+    if (useInfiniteTerrain) {
+        printf("Lancement de %d threads de maillage en parallele !\n", numThreads);
+        for (unsigned int i = 0; i < numThreads; ++i) {
+            workers.emplace_back(MeshingWorkerThread, std::ref(registry), std::ref(terrainSystem), std::ref(meshingSystem));
+        }
     }
     do {
         float currentFrame = glfwGetTime();
@@ -219,64 +303,110 @@ int main( void ) {
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        {
-            std::lock_guard<std::mutex> lock(ecsMutex);
-            terrainSystem.update(registry);
-            meshingSystem.update(registry);
-        }
-
-        int totalExpectedMeshes = TARGET_CHUNKS * 16;
-        int currentMeshesReady = 0;
-
-        if (isLoading) {
-            currentMeshesReady = meshingSystem.getCompletedMeshCount(registry);
-            if (currentMeshesReady >= totalExpectedMeshes) {
-                isLoading = false;
+        if (useInfiniteTerrain) {
+            {
+                std::lock_guard<std::mutex> lock(ecsMutex);
+                terrainSystem.update(registry);
+                meshingSystem.update(registry);
             }
-        }
 
-        if (isLoading) {
+            int totalExpectedMeshes = TARGET_CHUNKS * 16;
+            int currentMeshesReady = 0;
 
-            windowSystem.update(registry, window);
+            if (isLoading) {
+                currentMeshesReady = meshingSystem.getCompletedMeshCount(registry);
+                if (currentMeshesReady >= totalExpectedMeshes) {
+                    isLoading = false;
+                }
+            }
 
-            int displayW, displayH;
-            glfwGetFramebufferSize(window, &displayW, &displayH);
-            
-            ImGuiIO& current_io = ImGui::GetIO();
-            current_io.DisplaySize = ImVec2((float)displayW, (float)displayH);
+            if (isLoading) {
 
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui::NewFrame();
+                if (windowSystem.update(registry, window)) {
+                    inputSystem.resetMouseTracking(window);
+                }
 
-            ImGui::SetNextWindowPos(ImVec2(0, 0));
-            ImGui::SetNextWindowSize(current_io.DisplaySize);
-            ImGui::Begin("LoadingScreen", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
+                int displayW, displayH;
+                glfwGetFramebufferSize(window, &displayW, &displayH);
+                
+                ImGuiIO& current_io = ImGui::GetIO();
+                current_io.DisplaySize = ImVec2((float)displayW, (float)displayH);
 
-            float progress = (float)currentMeshesReady / totalExpectedMeshes;
-            // ----------------------------
+                ImGui_ImplOpenGL3_NewFrame();
+                ImGui::NewFrame();
 
-            ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.45f));
-            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "GENERATION DES MAILLAGES (MESHES)...");
-            
-            ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.50f));
-            ImGui::Text("Meshes prepares : %d / %d", currentMeshesReady, totalExpectedMeshes);
-            
-            ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.25f, current_io.DisplaySize.y * 0.55f));
-            ImGui::ProgressBar(progress, ImVec2(current_io.DisplaySize.x * 0.5f, 30.0f));
+                ImGui::SetNextWindowPos(ImVec2(0, 0));
+                ImGui::SetNextWindowSize(current_io.DisplaySize);
+                ImGui::Begin("LoadingScreen", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
 
-            ImGui::End();
-            ImGui::Render();
+                float progress = (float)currentMeshesReady / totalExpectedMeshes;
+                // ----------------------------
 
-            glDisable(GL_DEPTH_TEST);
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-            glEnable(GL_DEPTH_TEST);
+                ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.45f));
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "GENERATION DES MAILLAGES (MESHES)...");
+                
+                ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.50f));
+                ImGui::Text("Meshes prepares : %d / %d", currentMeshesReady, totalExpectedMeshes);
+                
+                ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.25f, current_io.DisplaySize.y * 0.55f));
+                ImGui::ProgressBar(progress, ImVec2(current_io.DisplaySize.x * 0.5f, 30.0f));
 
+                ImGui::End();
+                ImGui::Render();
+
+                glDisable(GL_DEPTH_TEST);
+                ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+                glEnable(GL_DEPTH_TEST);
+
+            } else {
+
+                inputSystem.update(registry, window);
+                cameraSystem.update(registry, deltaTime);
+                if (windowSystem.update(registry, window)) {
+                    inputSystem.resetMouseTracking(window);
+                }
+                pathFindingSystem.update(registry);
+
+                if (keyPressedOnce(window, GLFW_KEY_F10)) {
+                    usePbrShader = !usePbrShader;
+                    printf("Mode rendu: %s\n", usePbrShader ? "PBR" : "BASIC");
+                }
+
+                if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F9)) {
+                    debugTBN = !debugTBN;
+                    printf("Debug TBN: %s\n", debugTBN ? "ON" : "OFF");
+                }
+
+                GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
+                BlockTextureManager::bindArrays(activeProgramID);
+
+                glUseProgram(activeProgramID);
+                GLint debugLoc = glGetUniformLocation(activeProgramID, "debugTBN");
+                if (debugLoc >= 0) {
+                    glUniform1i(debugLoc, debugTBN ? 1 : 0);
+                }
+
+                renderSystem.update(registry, activeProgramID);
+                
+                if (debugWireframe) {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                }
+
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+                ImGui_ImplOpenGL3_NewFrame();
+                debugSystem.update(registry, window, deltaTime);
+                
+                glDisable(GL_DEPTH_TEST);
+                ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+                glEnable(GL_DEPTH_TEST);
+            }
         } else {
-
             inputSystem.update(registry, window);
             cameraSystem.update(registry, deltaTime);
-            windowSystem.update(registry, window);        
-            pathFindingSystem.update(registry);
+            if (windowSystem.update(registry, window)) {
+                inputSystem.resetMouseTracking(window);
+            }
 
             if (keyPressedOnce(window, GLFW_KEY_F10)) {
                 usePbrShader = !usePbrShader;

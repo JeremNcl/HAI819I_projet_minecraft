@@ -1,6 +1,7 @@
 # Variables
 BUILD_DIR = build
 EXECUTABLE = VoxelEngine
+ARGS ?= 3
 
 .PHONY: all configure build run clean distclean
 
@@ -19,7 +20,7 @@ build:
 
 # 3. Lancer le jeu (compile automatiquement avant si nécessaire)
 run: build
-	./$(BUILD_DIR)/$(EXECUTABLE)
+	./$(BUILD_DIR)/$(EXECUTABLE) $(ARGS)
 
 # 4. Nettoyage doux : supprime les binaires mais garde la config CMake
 clean:

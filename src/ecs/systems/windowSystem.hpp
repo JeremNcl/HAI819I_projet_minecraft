@@ -21,7 +21,7 @@ class WindowSystem {
     public:
         WindowSystem() = default;
 
-        void update(Registry& _registry, GLFWwindow* _window);
+        bool update(Registry& _registry, GLFWwindow* _window);
 };
 
 #endif

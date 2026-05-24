@@ -49,6 +49,8 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         input.mouseX = deltaX;
         input.mouseY = deltaY;
     }
+
+    f11PressedLastFrame = f11Pressed;
 }
 
 void InputSystem::setCursorMode(GLFWwindow* window, bool _locked) {
@@ -58,5 +60,17 @@ void InputSystem::setCursorMode(GLFWwindow* window, bool _locked) {
         firstMouse = true;
     } else {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+}
+
+void InputSystem::resetMouseTracking(GLFWwindow* window) {
+    firstMouse = true;
+
+    int width = 0;
+    int height = 0;
+    glfwGetWindowSize(window, &width, &height);
+
+    if (width > 0 && height > 0) {
+        glfwSetCursorPos(window, width * 0.5, height * 0.5);
     }
 }
