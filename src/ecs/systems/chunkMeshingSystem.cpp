@@ -1,5 +1,6 @@
 #include "chunkMeshingSystem.hpp"
 #include <algorithm>
+#include <cmath>
 #include "engine/render/BlockTextureManager.hpp"
 
 VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const {
@@ -62,10 +63,47 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
     glm::vec3 p2 = local_p2 + worldOffset;
     glm::vec3 p3 = local_p3 + worldOffset;
 
-    vertices.push_back({p0, normal, glm::vec3(getUV(local_p0), texIndex)});
-    vertices.push_back({p1, normal, glm::vec3(getUV(local_p1), texIndex)});
-    vertices.push_back({p2, normal, glm::vec3(getUV(local_p2), texIndex)});
-    vertices.push_back({p3, normal, glm::vec3(getUV(local_p3), texIndex)});
+    glm::vec2 uv0 = getUV(local_p0);
+    glm::vec2 uv1 = getUV(local_p1);
+    glm::vec2 uv2 = getUV(local_p2);
+    glm::vec2 uv3 = getUV(local_p3);
+
+    glm::vec3 deltaPos1 = p1 - p0;
+    glm::vec3 deltaPos2 = p2 - p0;
+    glm::vec2 deltaUV1 = uv1 - uv0;
+    glm::vec2 deltaUV2 = uv2 - uv0;
+
+    float det = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+    glm::vec3 tangent;
+    glm::vec3 bitangent;
+
+    if (std::abs(det) > 1e-6f) {
+        float invDet = 1.0f / det;
+        tangent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * invDet;
+        bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * invDet;
+    } else {
+        tangent = edge1;
+        bitangent = edge2;
+    }
+
+    tangent = glm::normalize(tangent - normal * glm::dot(normal, tangent));
+    if (!std::isfinite(tangent.x) || !std::isfinite(tangent.y) || !std::isfinite(tangent.z)) {
+        tangent = glm::normalize(edge1);
+    }
+
+    bitangent = glm::normalize(bitangent - normal * glm::dot(normal, bitangent));
+    if (!std::isfinite(bitangent.x) || !std::isfinite(bitangent.y) || !std::isfinite(bitangent.z)) {
+        bitangent = glm::normalize(glm::cross(normal, tangent));
+    }
+
+    if (glm::dot(glm::cross(tangent, bitangent), normal) < 0.0f) {
+        bitangent = -bitangent;
+    }
+
+    vertices.push_back({p0, normal, glm::vec3(uv0, texIndex), tangent, bitangent});
+    vertices.push_back({p1, normal, glm::vec3(uv1, texIndex), tangent, bitangent});
+    vertices.push_back({p2, normal, glm::vec3(uv2, texIndex), tangent, bitangent});
+    vertices.push_back({p3, normal, glm::vec3(uv3, texIndex), tangent, bitangent});
 
     indices.push_back(baseIdx);
     indices.push_back(baseIdx + 1);
@@ -232,6 +270,10 @@ void ChunkMeshingSystem::uploadMeshToGPU(MeshComponent& mesh, const MeshData& da
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoords));
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, tangent));
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, bitangent));
 
     glGenBuffers(1, &mesh.IBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.IBO);
