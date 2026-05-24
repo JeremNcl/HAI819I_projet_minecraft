@@ -35,6 +35,16 @@ VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData,
     return VoxelType::AIR;
 }
 
+glm::vec3 ChunkMeshingSystem::sampleBiomeColor(const SubChunkComponent& voxelData, const glm::vec3& localPos) const {
+    int x = static_cast<int>(std::round(localPos.x));
+    int z = static_cast<int>(std::round(localPos.z));
+
+    x = std::clamp(x, 0, 15);
+    z = std::clamp(z, 0, 15);
+
+    return voxelData.biomeColors[x + z * 16];
+}
+
 
 void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
                                   std::vector<GLuint>& indices,
@@ -44,13 +54,24 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
                                   glm::vec3 normal,
                                   float texIndex,
                                   int axis,
-                                  glm::vec3 worldOffset) {
+                                  bool isPositive,
+                                  glm::vec3 worldOffset,
+                                  const SubChunkComponent& voxelData) {
     GLuint baseIdx = static_cast<GLuint>(vertices.size());
 
-    auto getUV = [axis](glm::vec3 localPos) -> glm::vec2 {
-        if (axis == 0) return glm::vec2(localPos.z, localPos.y);
-        if (axis == 1) return glm::vec2(localPos.x, localPos.z);
-        return glm::vec2(localPos.x, localPos.y);
+    auto getUV = [axis, isPositive](glm::vec3 localPos) -> glm::vec2 {
+        if (axis == 0) {
+            return isPositive ? glm::vec2(localPos.z, localPos.y)
+                              : glm::vec2(1.0f - localPos.z, localPos.y);
+        }
+
+        if (axis == 1) {
+            return isPositive ? glm::vec2(localPos.x, 1.0f - localPos.z)
+                              : glm::vec2(localPos.x, localPos.z);
+        }
+
+        return isPositive ? glm::vec2(1.0f - localPos.x, localPos.y)
+                          : glm::vec2(localPos.x, localPos.y);
     };
 
     glm::vec3 local_p0 = corner;
@@ -62,6 +83,11 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
     glm::vec3 p1 = local_p1 + worldOffset;
     glm::vec3 p2 = local_p2 + worldOffset;
     glm::vec3 p3 = local_p3 + worldOffset;
+
+    glm::vec3 biome0 = sampleBiomeColor(voxelData, local_p0);
+    glm::vec3 biome1 = sampleBiomeColor(voxelData, local_p1);
+    glm::vec3 biome2 = sampleBiomeColor(voxelData, local_p2);
+    glm::vec3 biome3 = sampleBiomeColor(voxelData, local_p3);
 
     glm::vec2 uv0 = getUV(local_p0);
     glm::vec2 uv1 = getUV(local_p1);
@@ -100,10 +126,10 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
         bitangent = -bitangent;
     }
 
-    vertices.push_back({p0, normal, glm::vec3(uv0, texIndex), tangent, bitangent});
-    vertices.push_back({p1, normal, glm::vec3(uv1, texIndex), tangent, bitangent});
-    vertices.push_back({p2, normal, glm::vec3(uv2, texIndex), tangent, bitangent});
-    vertices.push_back({p3, normal, glm::vec3(uv3, texIndex), tangent, bitangent});
+    vertices.push_back({p0, normal, glm::vec3(uv0, texIndex), tangent, bitangent, biome0});
+    vertices.push_back({p1, normal, glm::vec3(uv1, texIndex), tangent, bitangent, biome1});
+    vertices.push_back({p2, normal, glm::vec3(uv2, texIndex), tangent, bitangent, biome2});
+    vertices.push_back({p3, normal, glm::vec3(uv3, texIndex), tangent, bitangent, biome3});
 
     indices.push_back(baseIdx);
     indices.push_back(baseIdx + 1);
@@ -227,9 +253,9 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
 
                             glm::vec3 calculatedNormal = glm::normalize(glm::cross(edge1, edge2));
                             if (glm::dot(calculatedNormal, normal) < 0) {
-                                addFace(result.vertices, result.indices, corner, edge2, edge1, normal, texIndex, axis, worldOffset);
+                                addFace(result.vertices, result.indices, corner, edge2, edge1, normal, texIndex, axis, isPositive, worldOffset, voxelData);
                             } else {
-                                addFace(result.vertices, result.indices, corner, edge1, edge2, normal, texIndex, axis, worldOffset);
+                                addFace(result.vertices, result.indices, corner, edge1, edge2, normal, texIndex, axis, isPositive, worldOffset, voxelData);
                             }
 
                             for (int l = 0; l < h; ++l) {
@@ -274,6 +300,8 @@ void ChunkMeshingSystem::uploadMeshToGPU(MeshComponent& mesh, const MeshData& da
     glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, tangent));
     glEnableVertexAttribArray(4);
     glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, bitangent));
+    glEnableVertexAttribArray(5);
+    glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, biomeColor));
 
     glGenBuffers(1, &mesh.IBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.IBO);

@@ -45,9 +45,10 @@ void ChunkWorker::processTasks() {
             continue;
         }
 
-        std::array<std::vector<BlockType>,16> data = m_generator.GenerateChunk(task.first, task.second);
+        std::array<glm::vec3, TerrainGenerator::CHUNK_WIDTH * TerrainGenerator::CHUNK_DEPTH> biomeColors;
+        std::array<std::vector<BlockType>,16> data = m_generator.GenerateChunk(task.first, task.second, &biomeColors);
         
         std::lock_guard<std::mutex> lock(resultsMutex);
-        results.push_back({task.first, task.second, std::move(data), true});
+        results.push_back({task.first, task.second, std::move(data), std::move(biomeColors), true});
     }
 }

@@ -8,6 +8,21 @@
 #include <array>
 #include <glm/glm.hpp>
 
+namespace {
+glm::vec3 computeBiomeTint(float desertWeight, float plainsWeight, float mountainWeight) {
+    const glm::vec3 desertTint(0.76f, 0.68f, 0.40f);
+    const glm::vec3 plainsTint(0.48f, 0.74f, 0.42f);
+    const glm::vec3 mountainTint(0.36f, 0.56f, 0.31f);
+
+    float weightSum = std::max(0.0001f, desertWeight + plainsWeight + mountainWeight);
+    float normalizedDesert = desertWeight / weightSum;
+    float normalizedPlains = plainsWeight / weightSum;
+    float normalizedMountain = mountainWeight / weightSum;
+
+    return normalizedDesert * desertTint + normalizedPlains * plainsTint + normalizedMountain * mountainTint;
+}
+} // namespace
+
 TerrainConfig LoadConfig(const std::string& filename) {
     TerrainConfig config;
     std::ifstream file(filename);
@@ -53,7 +68,7 @@ int TerrainGenerator::GetIndex(int x, int y, int z) const {
     return x + (z * CHUNK_WIDTH) + (y * CHUNK_DEPTH * CHUNK_WIDTH);
 }
 
-std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX, int chunkZ) {
+std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX, int chunkZ, std::array<glm::vec3, CHUNK_WIDTH * CHUNK_DEPTH>* outBiomeColors) {
     std::vector<BlockType> blocks(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH, BlockType::AIR);
     std::vector<glm::ivec3> treesToGenerate;
 
@@ -73,6 +88,10 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
     caveNoise.SetFrequency(m_config.caveFreq);
     biomeNoise.SetFrequency(m_config.biomeFreq);
 
+    if (outBiomeColors) {
+        outBiomeColors->fill(glm::vec3(1.0f));
+    }
+
     for (int z = 0; z < CHUNK_DEPTH; ++z) {
         for (int x = 0; x < CHUNK_WIDTH; ++x) {
             
@@ -85,6 +104,10 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
             float dW = std::max(0.0f, 1.0f - std::abs(biomeValue + 0.5f) / 0.5f);
             float mW = std::max(0.0f, 1.0f - std::abs(biomeValue - 0.5f) / 0.5f);
             float pW = 1.0f - dW - mW;
+
+            if (outBiomeColors) {
+                (*outBiomeColors)[x + z * CHUNK_WIDTH] = computeBiomeTint(dW, pW, mW);
+            }
 
             int localHeight = (int)(dW * m_config.heightDesert + 
                                     pW * m_config.heightPlains + 

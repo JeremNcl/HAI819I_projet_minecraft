@@ -64,6 +64,10 @@ bool usePbrShader = true;
 bool debugTBN = false;
 bool useNormalMap = true;
 bool debugDiffuseOnly = false;
+bool useReducedAmbient = false;
+
+static constexpr float kAmbientSoft = 0.045f;
+static constexpr float kAmbientCrisp = 0.035f;
 
 enum class TestSceneMode {
     SimpleSubChunk = 1,
@@ -137,6 +141,38 @@ static bool keyPressedOnce(GLFWwindow* _window, int key) {
     bool triggered = isPressed && !previousState[key];
     previousState[key] = isPressed;
     return triggered;
+}
+
+static float getAmbientStrength() {
+    return useReducedAmbient ? kAmbientCrisp : kAmbientSoft;
+}
+
+static glm::vec3 getLightColor() {
+    return useReducedAmbient
+        ? glm::vec3(3.00f, 2.94f, 2.86f)
+        : glm::vec3(2.85f, 2.78f, 2.70f);
+}
+
+static void applyActiveShaderUniforms(GLuint activeProgramID) {
+    GLint debugLoc = glGetUniformLocation(activeProgramID, "debugTBN");
+    if (debugLoc >= 0) {
+        glUniform1i(debugLoc, debugTBN ? 1 : 0);
+    }
+
+    GLint useNormalMapLoc = glGetUniformLocation(activeProgramID, "useNormalMap");
+    if (useNormalMapLoc >= 0) {
+        glUniform1i(useNormalMapLoc, useNormalMap ? 1 : 0);
+    }
+
+    GLint debugDiffuseOnlyLoc = glGetUniformLocation(activeProgramID, "debugDiffuseOnly");
+    if (debugDiffuseOnlyLoc >= 0) {
+        glUniform1i(debugDiffuseOnlyLoc, debugDiffuseOnly ? 1 : 0);
+    }
+
+    GLint ambientStrengthLoc = glGetUniformLocation(activeProgramID, "ambientStrength");
+    if (ambientStrengthLoc >= 0) {
+        glUniform1f(ambientStrengthLoc, getAmbientStrength());
+    }
 }
 
 std::mutex ecsMutex;
@@ -245,7 +281,7 @@ int main(int argc, char** argv) {
     
     printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem).\n");
     printf("Caméra initialisée en mode FREE_CAMERA.\n");
-    printf("Contrôles: WASD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation\n");
+    printf("Contrôles: WASD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation, F6=ambiance\n");
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     EntityID camEntity = registry.createEntity();
@@ -278,7 +314,7 @@ int main(int argc, char** argv) {
 
     printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem, InputSystem, CameraSystem).\n");
     printf("Caméra initialisée.\n");
-    printf("Contrôles: ZQSD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation\n");
+    printf("Contrôles: ZQSD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation, F6=ambiance\n");
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     bool isLoading = useInfiniteTerrain;
@@ -389,26 +425,21 @@ int main(int argc, char** argv) {
                     printf("Diffuse only: %s\n", debugDiffuseOnly ? "ON" : "OFF");
                 }
 
+                if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F6)) {
+                    useReducedAmbient = !useReducedAmbient;
+                    printf("Ambient preset: %s (ambient=%.3f, lightColor=%.2f %.2f %.2f)\n",
+                           useReducedAmbient ? "CRISP" : "SOFT",
+                           getAmbientStrength(),
+                           getLightColor().r, getLightColor().g, getLightColor().b);
+                }
+
                 GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
                 BlockTextureManager::bindArrays(activeProgramID);
 
                 glUseProgram(activeProgramID);
-                GLint debugLoc = glGetUniformLocation(activeProgramID, "debugTBN");
-                if (debugLoc >= 0) {
-                    glUniform1i(debugLoc, debugTBN ? 1 : 0);
-                }
+                applyActiveShaderUniforms(activeProgramID);
 
-                GLint useNormalMapLoc = glGetUniformLocation(activeProgramID, "useNormalMap");
-                if (useNormalMapLoc >= 0) {
-                    glUniform1i(useNormalMapLoc, useNormalMap ? 1 : 0);
-                }
-
-                GLint debugDiffuseOnlyLoc = glGetUniformLocation(activeProgramID, "debugDiffuseOnly");
-                if (debugDiffuseOnlyLoc >= 0) {
-                    glUniform1i(debugDiffuseOnlyLoc, debugDiffuseOnly ? 1 : 0);
-                }
-
-                renderSystem.update(registry, activeProgramID);
+                renderSystem.update(registry, activeProgramID, getLightColor());
                 
                 if (debugWireframe) {
                     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -450,26 +481,21 @@ int main(int argc, char** argv) {
                 printf("Diffuse only: %s\n", debugDiffuseOnly ? "ON" : "OFF");
             }
 
+            if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F6)) {
+                useReducedAmbient = !useReducedAmbient;
+                printf("Ambient preset: %s (ambient=%.3f, lightColor=%.2f %.2f %.2f)\n",
+                       useReducedAmbient ? "CRISP" : "SOFT",
+                       getAmbientStrength(),
+                       getLightColor().r, getLightColor().g, getLightColor().b);
+            }
+
             GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
             BlockTextureManager::bindArrays(activeProgramID);
 
             glUseProgram(activeProgramID);
-            GLint debugLoc = glGetUniformLocation(activeProgramID, "debugTBN");
-            if (debugLoc >= 0) {
-                glUniform1i(debugLoc, debugTBN ? 1 : 0);
-            }
+            applyActiveShaderUniforms(activeProgramID);
 
-            GLint useNormalMapLoc = glGetUniformLocation(activeProgramID, "useNormalMap");
-            if (useNormalMapLoc >= 0) {
-                glUniform1i(useNormalMapLoc, useNormalMap ? 1 : 0);
-            }
-
-            GLint debugDiffuseOnlyLoc = glGetUniformLocation(activeProgramID, "debugDiffuseOnly");
-            if (debugDiffuseOnlyLoc >= 0) {
-                glUniform1i(debugDiffuseOnlyLoc, debugDiffuseOnly ? 1 : 0);
-            }
-
-            renderSystem.update(registry, activeProgramID);
+            renderSystem.update(registry, activeProgramID, getLightColor());
             
             if (debugWireframe) {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

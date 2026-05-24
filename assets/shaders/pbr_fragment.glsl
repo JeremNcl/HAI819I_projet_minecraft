@@ -5,6 +5,7 @@ in VS_OUT {
     vec3 FragPos;
     vec3 TexCoords;
     vec3 Normal;
+    vec3 BiomeColor;
     mat3 TBN;
 } fs_in;
 
@@ -21,6 +22,7 @@ uniform float normalStrengths[5];
 uniform vec3 lightPos;
 uniform vec3 lightColor;
 uniform vec3 viewPos;
+uniform float ambientStrength;
 uniform bool debugTBN;
 uniform bool useNormalMap;
 uniform bool debugDiffuseOnly;
@@ -75,15 +77,22 @@ float getNormalStrength(float sliceIndex) {
 void main() {
     // Sample textures using XYZ coordinates (Z is the texture index)
     vec3 uvw = fs_in.TexCoords;
-    vec3 albedo = texture(colorMap, uvw).rgb;
+    vec4 colorSample = texture(colorMap, uvw);
+    vec3 albedo = colorSample.rgb;
     vec3 normal = texture(normalMap, uvw).rgb;
     vec3 metallicSample = texture(metallicMap, uvw).rgb;
 
-    // On applique le colorant de biome AVANT la correction Gamma
-    if (uvw.z >= 1.9) {
-        // Vrai vert Minecraft (sRGB : 124, 189, 75)
-        vec3 biomeColor = vec3(124.0/255.0, 189.0/255.0, 75.0/255.0);
-        albedo *= biomeColor;
+    const float kDirtSlice = 1.0;
+    const float kGrassTopSlice = 2.0;
+    const float kGrassSideSlice = 3.0;
+
+    if (abs(uvw.z - kGrassTopSlice) < 0.5) {
+        albedo = colorSample.rgb * fs_in.BiomeColor;
+    } else if (abs(uvw.z - kGrassSideSlice) < 0.5) {
+        vec3 dirtAlbedo = texture(colorMap, vec3(uvw.xy, kDirtSlice)).rgb;
+        float grassMask = colorSample.a;
+        vec3 grassyAlbedo = colorSample.rgb * fs_in.BiomeColor;
+        albedo = mix(dirtAlbedo, grassyAlbedo, grassMask);
     }
 
     // Correction de l'albedo (sRGB to Linear)
@@ -155,7 +164,7 @@ void main() {
     }
     
     // Ambient lighting (simple)
-    vec3 ambient = vec3(0.03) * albedo; // modif temporaire
+    vec3 ambient = vec3(ambientStrength) * albedo;
     
     vec3 color = ambient + Lo;
     

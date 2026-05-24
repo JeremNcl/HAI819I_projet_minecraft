@@ -123,6 +123,7 @@ public:
                 for (int subY = 0; subY < 16; ++subY){
                     EntityID subChunkEntity = registry.createEntity();
                     SubChunkComponent subChunk(glm::ivec3(result.x, subY, result.z));
+                    subChunk.biomeColors = result.biomeColors;
                     int solidCount = 0;
 
                     for (int y = 0; y < 16; ++y) {
