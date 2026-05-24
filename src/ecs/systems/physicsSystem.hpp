@@ -5,6 +5,7 @@
 #include "../registry.hpp"
 #include "../components/velocity.hpp"
 #include "../components/rigidBody.hpp"
+#include "../components/transform.hpp"
 
 class PhysicsSystem {
     private:

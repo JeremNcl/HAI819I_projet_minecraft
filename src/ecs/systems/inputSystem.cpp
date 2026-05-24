@@ -26,7 +26,6 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
     lastX = mouseX;
     lastY = mouseY;
 
-    static bool f11PressedLastFrame = false;
     bool f11Pressed = (glfwGetKey(_window, GLFW_KEY_F11) == GLFW_PRESS);
 
     for (EntityID entity : view) {
@@ -37,8 +36,8 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         input.moveBackward = (glfwGetKey(_window, GLFW_KEY_S) == GLFW_PRESS);
         input.moveLeft = (glfwGetKey(_window, GLFW_KEY_A) == GLFW_PRESS);
         input.moveRight = (glfwGetKey(_window, GLFW_KEY_D) == GLFW_PRESS);
-        input.moveUp = (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS);
-        input.moveDown = (glfwGetKey(_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS);
+        input.jump = (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS);
+        input.sprint = (glfwGetKey(_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
 
         if (f11Pressed && !f11PressedLastFrame) {
             input.toggleFullscreen = true;
@@ -49,6 +48,8 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         input.mouseX = deltaX;
         input.mouseY = deltaY;
     }
+
+    f11PressedLastFrame = f11Pressed;
 }
 
 void InputSystem::setCursorMode(GLFWwindow* window, bool _locked) {

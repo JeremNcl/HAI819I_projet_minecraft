@@ -11,6 +11,7 @@ struct RigidBodyComponent : public Component {
                                    //surtout dans le cas ou il faut la réduire
     bool isGrounded = false;
 
+    RigidBodyComponent() = default;
 };
 
 #endif

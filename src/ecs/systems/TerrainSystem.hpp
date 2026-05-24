@@ -15,7 +15,7 @@ private:
 public:
     TerrainSystem(const TerrainConfig& config) : m_worker(config) {}
 
-    void update(Registry& registry) {
+    void update(Registry& registry, WorldMapComponent& worldMap) {
         auto view = registry.view<TransformComponent, MeshComponent>();
 
         for (EntityID entity : view) {
@@ -66,11 +66,12 @@ public:
                     registry.addComponent(subChunkEntity, MeshComponent());
                     registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f,0.0f,0.0f)));
                     chunkManager.subChunks[subY] = subChunkEntity;
+
+                    worldMap.subChunkEntities[subChunk.subChunkPosition] = subChunkEntity;
                 }
 
                 chunkManager.isFullyGenerated = true;
                 registry.addComponent(parentEntity, chunkManager);
-                pendingRequests.erase(coords);
                 pendingRequests.erase(coords);
             }
         }

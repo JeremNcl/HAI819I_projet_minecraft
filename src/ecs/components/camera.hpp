@@ -19,11 +19,14 @@ struct CameraComponent : public Component {
     float aspectRatio = 4.f / 3.f;
     float nearPlane = .1f;
     float farPlane = 1000.f;
+    
+    glm::vec3 offset = glm::vec3(0.f);
 
     glm::mat4 viewMatrix = glm::mat4(1.f);
     glm::mat4 projectionMatrix = glm::mat4(1.f);
 
     bool isActive = false;
+    float mouseSensitivity = 0.05f;
 
     CameraComponent() = default;
 };

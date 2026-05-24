@@ -7,10 +7,23 @@
 
 namespace TestScenes {
 
+static WorldMapComponent& getOrCreateWorldMap(Registry& registry) {
+    auto view = registry.view<WorldMapComponent>();
+    for (EntityID entity : view) {
+        return registry.getComponent<WorldMapComponent>(entity);
+    }
+    
+    EntityID worldEntity = registry.createEntity();
+    registry.addComponent(worldEntity, WorldMapComponent());
+    return registry.getComponent<WorldMapComponent>(worldEntity);
+}
+
 void createSimpleChunk(Registry& registry) {
     printf("=== TEST SCENE: Simple Chunk ===\n");
     printf("Creating a single chunk parent with 16 SubChunks...\n");
-    
+
+    WorldMapComponent& worldMap = getOrCreateWorldMap(registry);
+
     EntityID parentChunkEntity = registry.createEntity();
     ChunkComponent chunkManager(glm::ivec2(0, 0));
     
@@ -39,6 +52,8 @@ void createSimpleChunk(Registry& registry) {
         registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f, 0.0f, 0.0f)));
         
         chunkManager.subChunks[subY] = subChunkEntity;
+
+        worldMap.subChunkEntities[subChunkData.subChunkPosition] = subChunkEntity;
     }
     
     chunkManager.isFullyGenerated = true;
@@ -49,6 +64,8 @@ void createTerrainChunk(Registry& registry) {
     printf("=== TEST SCENE: Procedural Terrain ===\n");
     TerrainConfig config;
     TerrainGenerator generator(config);
+
+    WorldMapComponent& worldMap = getOrCreateWorldMap(registry);
 
     int chunksGenerated = 0;
     int radius = 5;
@@ -88,6 +105,7 @@ void createTerrainChunk(Registry& registry) {
                 registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f, 0.0f, 0.0f)));
                 
                 chunkManager.subChunks[subY] = subChunkEntity;
+                worldMap.subChunkEntities[subChunk.subChunkPosition] = subChunkEntity;
             }
             
             chunkManager.isFullyGenerated = true;
@@ -106,6 +124,8 @@ void createDynamicTerrainScene(Registry& registry) {
     
     // Empty scene - chunks will be generated dynamically by TerrainSystem
     // during the ECS update loop
+
+    getOrCreateWorldMap(registry);
 }
 
 }  // namespace TestScenes

@@ -11,19 +11,14 @@ struct InputReceiverComponent : public Component {
     bool moveBackward = false;
     bool moveLeft = false;
     bool moveRight = false;
-
-    // Potentiellement Temporaire
-    bool moveUp = false;
-    bool moveDown = false;
+    bool jump = false;
+    bool sprint = false;
 
     bool toggleFullscreen = false;
 
     double mouseX = 0.;
     double mouseY = 0.;
-
-    float mouseSensitivity = .005f;
-    float movementSpeed = 5.f;
-
+    
     InputReceiverComponent() = default;
 };
 

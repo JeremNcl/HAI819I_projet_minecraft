@@ -1,7 +1,7 @@
 #include "chunkMeshingSystem.hpp"
 #include <algorithm>
 
-VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const SubChunkCache& cache) const {
+VoxelType ChunkMeshingSystem::getVoxelGlobal(Registry& registry, const SubChunkComponent& voxelData, int x, int y, int z, const WorldMapComponent& worldMap) const {
     if (x >= 0 && x < 16 && y >= 0 && y < 16 && z >= 0 && z < 16) {
         return voxelData.getVoxel(x, y, z);
     }
@@ -20,9 +20,10 @@ VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData,
     if (z < 0) { neighborPos.z -= 1; localZ = 15; }
     else if (z >= 16) { neighborPos.z += 1; localZ = 0; }
 
-    auto it = cache.find(neighborPos);
-    if (it != cache.end()) {
-        return it->second->getVoxel(localX, localY, localZ);
+    auto it = worldMap.subChunkEntities.find(neighborPos);
+    if (it != worldMap.subChunkEntities.end()) {
+        const SubChunkComponent& neighborComponent = registry.getComponent<SubChunkComponent>(it->second);
+        return neighborComponent.getVoxel(localX, localY, localZ);
     }
 
     return VoxelType::AIR;
@@ -82,16 +83,16 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
 void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                                       SubChunkComponent& voxelData,
                                       MeshComponent& mesh,
-                                      const SubChunkCache& cache) {
+                                      const WorldMapComponent& worldMap) {
     std::vector<Vertex> vertices;
     std::vector<GLuint> indices;
 
     int dims[3] = {SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z};
 
     glm::vec3 worldOffset(
-        voxelData.subChunkPosition.x * 16.0f,
-        voxelData.subChunkPosition.y * 16.0f,
-        voxelData.subChunkPosition.z * 16.0f
+        voxelData.subChunkPosition.x * SUBCHUNK_SIZE_X,
+        voxelData.subChunkPosition.y * SUBCHUNK_SIZE_Y,
+        voxelData.subChunkPosition.z * SUBCHUNK_SIZE_Z
     );
 
     for (int axis = 0; axis < 3; ++axis) {
@@ -119,7 +120,7 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                             int ny = x[1] + (isPositive ? q[1] : -q[1]);
                             int nz = x[2] + (isPositive ? q[2] : -q[2]);
 
-                            VoxelType neighbor = getVoxelGlobal(voxelData, nx, ny, nz, cache);
+                            VoxelType neighbor = getVoxelGlobal(registry, voxelData, nx, ny, nz, worldMap);
                             if (neighbor == VoxelType::AIR) {
                                 mask[x[u] + x[v] * dims[u]] = current;
                             } else {
@@ -219,21 +220,16 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
     glBindVertexArray(0);
 }
 
-void ChunkMeshingSystem::update(Registry& registry) {
+void ChunkMeshingSystem::update(Registry& registry, const WorldMapComponent& worldMap) {
     auto view = registry.view<SubChunkComponent, MeshComponent>();
-
-    SubChunkCache cache;
-    for (EntityID entity : view) {
-        const auto& subChunk = registry.getComponent<SubChunkComponent>(entity);
-        cache[subChunk.subChunkPosition] = &subChunk;
-    }
 
     for (EntityID entity : view) {
         auto& voxelData = registry.getComponent<SubChunkComponent>(entity);
 
+        // On ne met à jour le mesh QUE si le chunk a été modifié
         if (voxelData.meshDirty) {
             auto& mesh = registry.getComponent<MeshComponent>(entity);
-            generateMesh(registry, entity, voxelData, mesh, cache);
+            generateMesh(registry, entity, voxelData, mesh, worldMap);
             voxelData.meshDirty = false;
         }
     }

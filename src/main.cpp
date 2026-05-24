@@ -36,6 +36,8 @@ using namespace glm;
 #include "ecs/components/chunk.hpp"
 #include "ecs/components/camera.hpp"
 #include "ecs/components/inputReceiver.hpp"
+#include "ecs/components/world.hpp"
+#include "ecs/components/deltaTime.hpp"
 #include "ecs/systems/chunkMeshingSystem.hpp"
 #include "ecs/systems/renderSystem.hpp"
 #include "ecs/systems/inputSystem.hpp"
@@ -44,15 +46,13 @@ using namespace glm;
 #include "ecs/systems/debugSystem.hpp"
 #include "ecs/systems/PathFindingSystem.hpp"
 #include "ecs/systems/TerrainSystem.hpp"
-#include "ecs/systems/movementSystem.hpp"
+#include "ecs/systems/playerMovementSystem.hpp"
 #include "ecs/systems/physicsSystem.hpp"
+#include "ecs/systems/collisionSystem.hpp"
+#include "ecs/systems/deltaTimeSystem.hpp"
 
 //void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-
-// timing
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
 
 // Debug flags
 bool debugWireframe = false;
@@ -145,15 +145,34 @@ int main( void ) {
         TestScenes::createDynamicTerrainScene(registry);
     }
     
+    // CREATION DU COMPONENT UNIQUE WORLDMAP
+    auto worldMapView = registry.view<WorldMapComponent>();
+    if (worldMapView.isEmpty()) {
+        EntityID worldEntity = registry.createEntity();
+        registry.addComponent(worldEntity, WorldMapComponent());
+        worldMapView = registry.view<WorldMapComponent>();
+    }
+    WorldMapComponent& worldMap = registry.getComponent<WorldMapComponent>(*worldMapView.begin());
+
+    auto deltaTimeView = registry.view<DeltaTimeComponent>();
+    if (deltaTimeView.isEmpty()) {
+        EntityID deltaTimeEntity = registry.createEntity();
+        registry.addComponent(deltaTimeEntity, DeltaTimeComponent());
+        deltaTimeView = registry.view<DeltaTimeComponent>();
+    }
+    DeltaTimeComponent& deltaTimeComponent = registry.getComponent<DeltaTimeComponent>(*deltaTimeView.begin());
+
     // Créer les systèmes
+    DeltaTimeSystem deltaTimeSystem;
     ChunkMeshingSystem meshingSystem;
     RenderSystem renderSystem;
     InputSystem inputSystem(window);
     WindowSystem windowSystem;
     CameraSystem cameraSystem;
     DebugSystem debugSystem;
-    MovementSystem movementSystem;
+    PlayerMovementSystem movementSystem;
     PhysicsSystem physicsSystem;
+    CollisionSystem collisionSystem;
     
     // Systèmes du dev bonus
     TerrainConfig config = LoadConfig("config.txt");
@@ -167,15 +186,19 @@ int main( void ) {
 
     EntityID camEntity = registry.createEntity();
     registry.addComponent(camEntity, TransformComponent{
-        glm::vec3(45,50,-55),
+        glm::vec3(50,100,50),
         glm::vec3(0,0,0)
     });
     registry.addComponent(camEntity, CameraComponent{ .isActive = true});
     registry.addComponent(camEntity, InputReceiverComponent{});
     registry.addComponent(camEntity, RigidBodyComponent{});
     registry.addComponent(camEntity, VelocityComponent{});
+    registry.addComponent(camEntity, ColliderComponent{
+        glm::vec3(.6f, 1.8f, .6f),
+        glm::vec3(0.f, .9f, 0.f)
+    });
 
-    cameraSystem.initCamera(registry, camEntity, 90, 0);
+    cameraSystem.initCamera(registry, camEntity, 90, 0, glm::vec3(0,1.8,0));
 
     //Setup curseur au demarrage
     inputSystem.setCursorMode(window, true);
@@ -199,21 +222,22 @@ int main( void ) {
 
     do {
         // Calcul du deltaTime
-        float currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+
+        deltaTimeSystem.update(deltaTimeComponent);
+        float deltaTime = deltaTimeComponent.deltaTime;
 
         // Clear the screen
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Update ECS Systems
-        meshingSystem.update(registry);
+        meshingSystem.update(registry, worldMap);
+        terrainSystem.update(registry, worldMap);
         inputSystem.update(registry, window);
-        physicsSystem.update(registry, deltaTime);
-        movementSystem.update(registry, deltaTime);
         cameraSystem.update(registry, deltaTime);
+        movementSystem.update(registry, deltaTime);
+        physicsSystem.update(registry, deltaTime);
+        collisionSystem.update(registry, worldMap, deltaTime);
         windowSystem.update(registry, window);        
-        terrainSystem.update(registry);
         pathFindingSystem.update(registry);
         renderSystem.update(registry, basicProgramID);
         

@@ -12,6 +12,7 @@ class InputSystem {
         double lastY;
         bool firstMouse = true;
         bool cursorLocked = true; // TODO : Verifier que c'est vraiment utile
+        bool f11PressedLastFrame = false;
 
     public:
         InputSystem(GLFWwindow* _window);

@@ -14,7 +14,7 @@ class CameraSystem {
     public:
         void update(Registry& _registry, float _deltaTime);
 
-        void initCamera(Registry& _registry, EntityID _entity, float _yaw, float _pitch);
+        void initCamera(Registry& _registry, EntityID _entity, float _yaw, float _pitch, glm::vec3 _offset);
 };
 
 #endif
