@@ -1,7 +1,8 @@
 #include "chunkMeshingSystem.hpp"
 #include <algorithm>
+#include "engine/render/BlockTextureManager.hpp"
 
-VoxelType ChunkMeshingSystem::getVoxelGlobal(Registry& registry, const SubChunkComponent& voxelData, int x, int y, int z, const WorldMapComponent& worldMap) const {
+VoxelType ChunkMeshingSystem::getVoxelGlobal(Registry& registry, const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const {
     if (x >= 0 && x < 16 && y >= 0 && y < 16 && z >= 0 && z < 16) {
         return voxelData.getVoxel(x, y, z);
     }
@@ -20,25 +21,22 @@ VoxelType ChunkMeshingSystem::getVoxelGlobal(Registry& registry, const SubChunkC
     if (z < 0) { neighborPos.z -= 1; localZ = 15; }
     else if (z >= 16) { neighborPos.z += 1; localZ = 0; }
 
-    auto it = worldMap.subChunkEntities.find(neighborPos);
+    /* auto it = worldMap.subChunkEntities.find(neighborPos);
     if (it != worldMap.subChunkEntities.end()) {
         const SubChunkComponent& neighborComponent = registry.getComponent<SubChunkComponent>(it->second);
         return neighborComponent.getVoxel(localX, localY, localZ);
+ */
+    auto it = std::lower_bound(cache.begin(), cache.end(), neighborPos, [](const SubChunkComponent* comp, const glm::ivec3& pos) {
+        if (comp->subChunkPosition.x != pos.x) return comp->subChunkPosition.x < pos.x;
+        if (comp->subChunkPosition.y != pos.y) return comp->subChunkPosition.y < pos.y;
+        return comp->subChunkPosition.z < pos.z;
+    });
+
+    if (it != cache.end() && (*it)->subChunkPosition == neighborPos) {
+        return (*it)->getVoxel(localX, localY, localZ);
     }
 
     return VoxelType::AIR;
-}
-
-static float getTextureIndex(VoxelType type, int axis, bool isPositive) {
-    switch (type) {
-        case VoxelType::STONE: return 3.0f;
-        case VoxelType::DIRT:  return 0.0f;
-        case VoxelType::GRASS:
-            if (axis == 1 && isPositive) return 1.0f;
-            if (axis == 1 && !isPositive) return 0.0f;
-            return 2.0f;
-        default: return 0.0f;
-    }
 }
 
 
@@ -53,40 +51,73 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
                                   glm::vec3 worldOffset) {
     GLuint baseIdx = static_cast<GLuint>(vertices.size());
 
-    auto getUV = [axis](glm::vec3 pos) -> glm::vec2 {
-        if (axis == 0) return glm::vec2(pos.z, pos.y);
-        if (axis == 1) return glm::vec2(pos.x, pos.z);
-        return glm::vec2(pos.x, pos.y);
+    auto getUV = [axis](glm::vec3 localPos) -> glm::vec2 {
+        if (axis == 0) return glm::vec2(localPos.z, localPos.y);
+        if (axis == 1) return glm::vec2(localPos.x, localPos.z);
+        return glm::vec2(localPos.x, localPos.y);
     };
 
-    glm::vec3 p0 = corner + worldOffset;
-    glm::vec3 p1 = corner + edge1 + worldOffset;
-    glm::vec3 p2 = corner + edge1 + edge2 + worldOffset;
-    glm::vec3 p3 = corner + edge2 + worldOffset;
+    glm::vec3 local_p0 = corner;
+    glm::vec3 local_p1 = corner + edge1;
+    glm::vec3 local_p2 = corner + edge1 + edge2;
+    glm::vec3 local_p3 = corner + edge2;
 
-    vertices.push_back({p0, normal, glm::vec3(getUV(p0), texIndex)});
-    vertices.push_back({p1, normal, glm::vec3(getUV(p1), texIndex)});
-    vertices.push_back({p2, normal, glm::vec3(getUV(p2), texIndex)});
-    vertices.push_back({p3, normal, glm::vec3(getUV(p3), texIndex)});
+    glm::vec3 p0 = local_p0 + worldOffset;
+    glm::vec3 p1 = local_p1 + worldOffset;
+    glm::vec3 p2 = local_p2 + worldOffset;
+    glm::vec3 p3 = local_p3 + worldOffset;
 
-    // Triangle 1
+    vertices.push_back({p0, normal, glm::vec3(getUV(local_p0), texIndex)});
+    vertices.push_back({p1, normal, glm::vec3(getUV(local_p1), texIndex)});
+    vertices.push_back({p2, normal, glm::vec3(getUV(local_p2), texIndex)});
+    vertices.push_back({p3, normal, glm::vec3(getUV(local_p3), texIndex)});
+
     indices.push_back(baseIdx);
     indices.push_back(baseIdx + 1);
     indices.push_back(baseIdx + 2);
 
-    // Triangle 2
     indices.push_back(baseIdx);
     indices.push_back(baseIdx + 2);
     indices.push_back(baseIdx + 3);
 }
 
-void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
+/* void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                                       SubChunkComponent& voxelData,
                                       MeshComponent& mesh,
                                       const WorldMapComponent& worldMap) {
     std::vector<Vertex> vertices;
     std::vector<GLuint> indices;
+} */
 
+bool ChunkMeshingSystem::isMeshingComplete(Registry& registry) const {
+    auto view = registry.view<SubChunkComponent>();
+    
+    for (EntityID entity : view) {
+        if (registry.getComponent<SubChunkComponent>(entity).meshDirty) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+int ChunkMeshingSystem::getCompletedMeshCount(Registry& registry) const {
+    auto view = registry.view<SubChunkComponent>();
+    int completed = 0;
+    
+    for (EntityID entity : view) {
+        if (!registry.getComponent<SubChunkComponent>(entity).meshDirty) {
+            completed++;
+        }
+    }
+    return completed;
+}
+
+
+MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID entity,
+                                      SubChunkComponent& voxelData,
+                                      const subChunkCache& cache) {
+    MeshData result;
     int dims[3] = {SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z};
 
     glm::vec3 worldOffset(
@@ -94,6 +125,7 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
         voxelData.subChunkPosition.y * SUBCHUNK_SIZE_Y,
         voxelData.subChunkPosition.z * SUBCHUNK_SIZE_Z
     );
+
 
     for (int axis = 0; axis < 3; ++axis) {
         int u = (axis + 1) % 3;
@@ -120,7 +152,7 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                             int ny = x[1] + (isPositive ? q[1] : -q[1]);
                             int nz = x[2] + (isPositive ? q[2] : -q[2]);
 
-                            VoxelType neighbor = getVoxelGlobal(registry, voxelData, nx, ny, nz, worldMap);
+                            VoxelType neighbor = getVoxelGlobal(registry, voxelData, nx, ny, nz, cache);
                             if (neighbor == VoxelType::AIR) {
                                 mask[x[u] + x[v] * dims[u]] = current;
                             } else {
@@ -166,13 +198,13 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
                             glm::vec3 edge1(du[0], du[1], du[2]);
                             glm::vec3 edge2(dv[0], dv[1], dv[2]);
 
-                            float texIndex = getTextureIndex(type, axis, isPositive);
+                            float texIndex = static_cast<float>(BlockTextureManager::getTextureSliceIndex(type, axis, isPositive));
 
                             glm::vec3 calculatedNormal = glm::normalize(glm::cross(edge1, edge2));
                             if (glm::dot(calculatedNormal, normal) < 0) {
-                                addFace(vertices, indices, corner, edge2, edge1, normal, texIndex, axis, worldOffset);
+                                addFace(result.vertices, result.indices, corner, edge2, edge1, normal, texIndex, axis, worldOffset);
                             } else {
-                                addFace(vertices, indices, corner, edge1, edge2, normal, texIndex, axis, worldOffset);
+                                addFace(result.vertices, result.indices, corner, edge1, edge2, normal, texIndex, axis, worldOffset);
                             }
 
                             for (int l = 0; l < h; ++l) {
@@ -189,9 +221,13 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
             }
         }
     }
+    return result; 
+}
 
+
+void ChunkMeshingSystem::uploadMeshToGPU(MeshComponent& mesh, const MeshData& data) {
     mesh.cleanup();
-    if (vertices.empty()) {
+    if (data.vertices.empty()) {
         mesh.indexCount = 0;
         return;
     }
@@ -201,26 +237,24 @@ void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
 
     glGenBuffers(1, &mesh.VBO);
     glBindBuffer(GL_ARRAY_BUFFER, mesh.VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, data.vertices.size() * sizeof(Vertex), data.vertices.data(), GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);  
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
-
     glEnableVertexAttribArray(1);  
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
-
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoords));
 
     glGenBuffers(1, &mesh.IBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.IBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.indices.size() * sizeof(GLuint), data.indices.data(), GL_STATIC_DRAW);
 
-    mesh.indexCount = indices.size();
+    mesh.indexCount = data.indices.size();
     glBindVertexArray(0);
 }
 
-void ChunkMeshingSystem::update(Registry& registry, const WorldMapComponent& worldMap) {
+/* void ChunkMeshingSystem::update(Registry& registry, const WorldMapComponent& worldMap) {
     auto view = registry.view<SubChunkComponent, MeshComponent>();
 
     for (EntityID entity : view) {
@@ -231,6 +265,24 @@ void ChunkMeshingSystem::update(Registry& registry, const WorldMapComponent& wor
             auto& mesh = registry.getComponent<MeshComponent>(entity);
             generateMesh(registry, entity, voxelData, mesh, worldMap);
             voxelData.meshDirty = false;
+             */
+
+void ChunkMeshingSystem::update(Registry& registry, const WorldMapComponent& worldMap) {
+    std::lock_guard<std::mutex> lock(uploadMutex);
+    
+    int uploadsThisFrame = 0;
+    while (!uploadQueue.empty() && uploadsThisFrame < 150) {
+        MeshResult result = uploadQueue.front();
+        uploadQueue.pop();
+
+        if (registry.hasComponent<MeshComponent>(result.entity)) {
+            auto& mesh = registry.getComponent<MeshComponent>(result.entity);
+            uploadMeshToGPU(mesh, result.data);
+            
+            if (registry.hasComponent<SubChunkComponent>(result.entity)) {
+                registry.getComponent<SubChunkComponent>(result.entity).meshDirty = false;
+            }
         }
+        uploadsThisFrame++;
     }
 }

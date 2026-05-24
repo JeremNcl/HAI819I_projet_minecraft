@@ -1,6 +1,6 @@
 #include "debugSystem.hpp"
 
-void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTime) {
+void DebugSystem::update(Registry& _registry, GLFWwindow* _window, float _deltaTime, float _rawDeltaTime) {
     int displayW, displayH;
     glfwGetFramebufferSize(_window, &displayW, &displayH);
     
@@ -17,10 +17,10 @@ void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTim
         ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "=== Camera Debug ===");
         
         // Recuperation de la camera
-        auto view = registry.view<CameraComponent, TransformComponent>();
+        auto view = _registry.view<CameraComponent, TransformComponent>();
         for (EntityID entity : view) {
-            auto& cam = registry.getComponent<CameraComponent>(entity);
-            auto& transform = registry.getComponent<TransformComponent>(entity);
+            auto& cam = _registry.getComponent<CameraComponent>(entity);
+            auto& transform = _registry.getComponent<TransformComponent>(entity);
             
             if (cam.isActive) {
                 ImGui::Text("Position: (%.2f, %.2f, %.2f)", transform.position.x, transform.position.y, transform.position.z);
@@ -30,8 +30,8 @@ void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTim
         
         ImGui::Separator();
         ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "=== Performance ===");
-        ImGui::Text("FPS: %.1f", 1.0f / deltaTime);
-        ImGui::Text("DeltaTime: %.4f ms", deltaTime * 1000.0f);
+        ImGui::Text("FPS: %.1f", 1.0f / _rawDeltaTime);
+        ImGui::Text("DeltaTime: %.4f ms", _deltaTime * 1000.0f);
     }
     ImGui::End();
 

@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <cstddef>
 
+
 struct MeshComponent : public Component {
     GLuint VAO = 0;
     GLuint VBO = 0;
@@ -29,7 +30,4 @@ struct MeshComponent : public Component {
         indexCount = 0;
     }
 
-    ~MeshComponent() {
-        cleanup();
-    }
 };

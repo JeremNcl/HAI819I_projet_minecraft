@@ -2,9 +2,9 @@
 #ifndef WINDOWSYSTEM_HPP
 #define WINDOWSYSTEM_HPP
 
-#include "../registry.hpp"
-#include "../components/inputReceiver.hpp"
-#include "../components/camera.hpp"
+#include "ecs/registry.hpp"
+#include "ecs/components/inputReceiver.hpp"
+#include "ecs/components/camera.hpp"
 
 #include <GLFW/glfw3.h>
 

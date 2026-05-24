@@ -2,6 +2,14 @@
 cmake_minimum_required (VERSION 3.5)
 project (VoxelEngine)
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# On s'assure que le mode Release utilise l'optimisation maximale (-O3)
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+# ------------------------------------
+
 find_package(OpenGL REQUIRED)
 
 # Sécurité pour obliger la compilation dans un dossier séparé
@@ -41,8 +49,8 @@ add_definitions(
 
 # === MAGIE CMAKE ===
 # Récupération automatique de tous les fichiers .cpp et .hpp dans le dossier src/ et ses sous-dossiers
-file(GLOB_RECURSE SOURCES "src/*.cpp")
-file(GLOB_RECURSE HEADERS "src/*.hpp" "src/*.h")
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
+file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS "src/*.hpp" "src/*.h")
 
 # ImGui sources
 set(IMGUI_SOURCES

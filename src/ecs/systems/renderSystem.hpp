@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../registry.hpp"
-#include "../components/mesh.hpp"
-#include "../components/transform.hpp"
-#include "../components/chunk.hpp"
+#include "ecs/registry.hpp"
+#include "ecs/components/mesh.hpp"
+#include "ecs/components/transform.hpp"
+#include "ecs/components/chunk.hpp"
 #include <glm/glm.hpp>
 #include <array>
 
@@ -15,6 +15,7 @@ public:
 
 private:
     void renderMesh(GLuint shaderProgram,
+                    GLint locMVP,
                     const MeshComponent& mesh,
                     const glm::mat4& modelMatrix,
                     const glm::mat4& viewMatrix,

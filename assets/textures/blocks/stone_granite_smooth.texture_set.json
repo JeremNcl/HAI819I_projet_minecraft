@@ -1,8 +1,0 @@
-{
-  "format_version": "1.16.100",
-  "minecraft:texture_set": {
-    "color": "stone_granite_smooth",
-    "metalness_emissive_roughness": "roughness75_mer",
-    "normal": "normal0_normal"
-  }
-}

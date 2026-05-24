@@ -4,10 +4,10 @@
 #include <queue>
 #include <cmath>
 #include <glm/glm.hpp>
-#include "../terrain_gen/TerrainGenerator.hpp"
-#include "../../ecs/registry.hpp"
-#include "../../ecs/components/chunk.hpp"
-#include "../../ecs/components/mesh.hpp"
+#include "modules/terrain_gen/TerrainGenerator.hpp"
+#include "ecs/registry.hpp"
+#include "ecs/components/chunk.hpp"
+#include "ecs/components/mesh.hpp"
 
 #ifndef GLM_VEC3_HASH_DEFINED
 #define GLM_VEC3_HASH_DEFINED

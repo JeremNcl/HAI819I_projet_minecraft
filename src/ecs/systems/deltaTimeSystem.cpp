@@ -8,5 +8,7 @@ void DeltaTimeSystem::update(DeltaTimeComponent& _deltaTime) {
 
     _deltaTime.lastFrame = currentFrame;
 
+    _deltaTime.rawDeltaTime = currentDeltaTime;
+
     _deltaTime.deltaTime = std::min(currentDeltaTime, _deltaTime.maxDeltaTime) * _deltaTime.timeScale;
 }

@@ -2,16 +2,16 @@
 #ifndef DEBUGSYSTEM_HPP
 #define DEBUGSYSTEM_HPP
 
-#include "../registry.hpp"
-#include "../components/camera.hpp"
-#include "../components/transform.hpp"
+#include "ecs/registry.hpp"
+#include "ecs/components/camera.hpp"
+#include "ecs/components/transform.hpp"
 
 #include <imgui.h>
 #include <GLFW/glfw3.h>
 
 class DebugSystem {
     public:
-        void update(Registry& _registry, GLFWwindow* _window, float _deltaTime);
+        void update(Registry& _registry, GLFWwindow* _window, float _deltaTime, float _rawDeltaTime);
 };
 
 #endif

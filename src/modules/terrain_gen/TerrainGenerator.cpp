@@ -6,6 +6,7 @@
 #include <iostream>
 #include <algorithm>
 #include <array>
+#include <glm/glm.hpp>
 
 TerrainConfig LoadConfig(const std::string& filename) {
     TerrainConfig config;
@@ -54,6 +55,7 @@ int TerrainGenerator::GetIndex(int x, int y, int z) const {
 
 std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX, int chunkZ) {
     std::vector<BlockType> blocks(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH, BlockType::AIR);
+    std::vector<glm::ivec3> treesToGenerate;
 
     FastNoiseLite terrainNoise;
     terrainNoise.SetSeed(m_seed);
@@ -115,10 +117,17 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
             }
 
             int surfaceY = terrainHeight;
-            if ((std::rand() % 100) < m_config.treeChance) {
-                GenerateTree(x, surfaceY + 1, z, blocks);
+            bool isAwayFromEdge = (x >= 2 && x < CHUNK_WIDTH - 2 && z >= 2 && z < CHUNK_DEPTH - 2);
+
+            if (isAwayFromEdge) {
+                if ((std::rand() % 1000) < m_config.treeChance) {
+                    treesToGenerate.push_back(glm::ivec3(x, surfaceY + 1, z));
+                }
             }
         }
+    }
+    for (const auto& pos : treesToGenerate) {
+        GenerateTree(pos.x, pos.y, pos.z, blocks);
     }
 
     const std::vector<MineralConfig> mineralRules = {
