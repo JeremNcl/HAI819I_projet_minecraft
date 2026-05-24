@@ -3,6 +3,7 @@
 #include "engine/io/textureLoader.hpp"
 #include "engine/render/BlockDefinitionRegistry.hpp"
 #include <GL/glew.h>
+#include <array>
 
 class BlockTextureManager {
 private:
@@ -10,6 +11,7 @@ private:
     static GLuint normalArrayID;
     static GLuint metallicArrayID;
     static int sliceCount;
+    static std::array<float, 5> normalStrengths;
 
 public:
     static void initialize();

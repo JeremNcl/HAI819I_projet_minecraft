@@ -1,43 +1,110 @@
 #include "BlockTextureManager.hpp"
+#include "PackTextureImporter.hpp"
+
 #include <iostream>
+#include <array>
+#include <vector>
 
 GLuint BlockTextureManager::colorArrayID = 0;
 GLuint BlockTextureManager::normalArrayID = 0;
 GLuint BlockTextureManager::metallicArrayID = 0;
 int BlockTextureManager::sliceCount = 0;
+std::array<float, 5> BlockTextureManager::normalStrengths = {0.28f, 0.28f, 0.28f, 0.28f, 0.28f};
+
+namespace {
+constexpr const char* kSourceTextureRoot = "/home/jerem/Documents/M1_IMAGINE_2025-2026/Semestre8/Moteur_De_Jeux/Projet/Vanilla-RTX-Opus-1.26.13/textures/blocks";
+constexpr const char* kLocalTextureRoot = "assets/textures/blocks";
+
+bool appendTextureSet(const std::string& textureSetPath,
+                      std::vector<std::string>& colorPaths,
+                      std::vector<std::string>& normalPaths,
+                      std::vector<std::string>& metallicPaths,
+                      std::array<float, 5>& strengths,
+                      size_t targetIndex) {
+    ImportedTextureSet importedSet;
+    if (!PackTextureImporter::importTextureSet(textureSetPath, kLocalTextureRoot, importedSet)) {
+        return false;
+    }
+
+    if (targetIndex >= colorPaths.size() || targetIndex >= normalPaths.size() || targetIndex >= metallicPaths.size()) {
+        return false;
+    }
+
+    colorPaths[targetIndex] = importedSet.colorPath;
+    normalPaths[targetIndex] = importedSet.normalPath;
+    metallicPaths[targetIndex] = importedSet.merPath;
+    strengths[targetIndex] = importedSet.normalStrength;
+    return true;
+}
+} // namespace
 
 void BlockTextureManager::initialize() {
     std::cout << "Initializing Block Texture Arrays..." << std::endl;
 
     BlockDefinitionRegistry::initialize();
 
-    // 1. Liste ordonnée des chemins pour l'Albedo
-    std::vector<std::string> colorPaths = {
-        "assets/textures/blocks/stone.tga",       // Index 0
-        "assets/textures/blocks/dirt.tga",        // Index 1
-        "assets/textures/blocks/grass_top.tga",   // Index 2
-        "assets/textures/blocks/grass_side.tga",  // Index 3
-        ""                                         // Index 4: fallback magenta
-    };
+    std::vector<std::string> colorPaths(5);
+    std::vector<std::string> normalPaths(5);
+    std::vector<std::string> metallicPaths(5);
+    normalStrengths = {0.28f, 0.28f, 0.28f, 0.28f, 0.28f};
 
-    // 2. Liste ordonnée des chemins pour les Normales
-    std::vector<std::string> normalPaths = {
-        "assets/textures/blocks/stone_normal.tga",     // Index 0
-        "assets/textures/blocks/dirt_normal.tga",      // Index 1
-        "assets/textures/blocks/grass_top_normal.tga", // Index 2
-        "assets/textures/blocks/grass_side_normal.tga",// Index 3
-        ""                                             // Index 4: fallback magenta
-    };
+    const bool importedStone = appendTextureSet(
+        std::string(kSourceTextureRoot) + "/stone.texture_set.json",
+        colorPaths,
+        normalPaths,
+        metallicPaths,
+        normalStrengths,
+        0);
 
-    // 3. Liste ordonnée des chemins pour le Metallic/Roughness (MER)
-    // R = Metallic, G = Emission, B = Roughness
-    std::vector<std::string> metallicPaths = {
-        "assets/textures/blocks/stone_mer.tga",        // Index 0
-        "assets/textures/blocks/dirt_mer.tga",         // Index 1
-        "assets/textures/blocks/grass_top_mer.tga",    // Index 2
-        "assets/textures/blocks/grass_side_mer.tga",   // Index 3
-        ""                                              // Index 4: fallback magenta
-    };
+    const bool importedDirt = appendTextureSet(
+        std::string(kSourceTextureRoot) + "/dirt.texture_set.json",
+        colorPaths,
+        normalPaths,
+        metallicPaths,
+        normalStrengths,
+        1);
+
+    const bool importedGrassTop = appendTextureSet(
+        std::string(kSourceTextureRoot) + "/grass_top.texture_set.json",
+        colorPaths,
+        normalPaths,
+        metallicPaths,
+        normalStrengths,
+        2);
+
+    const bool importedGrassSide = appendTextureSet(
+        std::string(kSourceTextureRoot) + "/grass_side.texture_set.json",
+        colorPaths,
+        normalPaths,
+        metallicPaths,
+        normalStrengths,
+        3);
+
+    if (!importedStone || !importedDirt || !importedGrassTop || !importedGrassSide) {
+        std::cerr << "Pack import failed for the first block set, falling back to local assets." << std::endl;
+        colorPaths = {
+            "assets/textures/blocks/stone.tga",
+            "assets/textures/blocks/dirt.tga",
+            "assets/textures/blocks/grass_top.tga",
+            "assets/textures/blocks/grass_side.tga",
+            ""
+        };
+        normalPaths = {
+            "assets/textures/blocks/stone_normal.tga",
+            "assets/textures/blocks/dirt_normal.tga",
+            "assets/textures/blocks/grass_top_normal.tga",
+            "assets/textures/blocks/grass_side_normal.tga",
+            ""
+        };
+        metallicPaths = {
+            "assets/textures/blocks/stone_mer.tga",
+            "assets/textures/blocks/dirt_mer.tga",
+            "assets/textures/blocks/grass_top_mer.tga",
+            "assets/textures/blocks/grass_side_mer.tga",
+            ""
+        };
+        normalStrengths = {0.22f, 0.45f, 0.42f, 0.38f, 0.28f};
+    }
 
     // Chargement des 3 Texture Arrays
     colorArrayID = loadTextureArray(colorPaths);
@@ -72,6 +139,11 @@ void BlockTextureManager::bindArrays(GLuint shaderProgram) {
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D_ARRAY, metallicArrayID);
     glUniform1i(glGetUniformLocation(shaderProgram, "metallicMap"), 2);
+
+    GLint normalStrengthsLoc = glGetUniformLocation(shaderProgram, "normalStrengths");
+    if (normalStrengthsLoc >= 0) {
+        glUniform1fv(normalStrengthsLoc, static_cast<GLsizei>(normalStrengths.size()), normalStrengths.data());
+    }
     
     // Rétablir l'unité active par défaut
     glActiveTexture(GL_TEXTURE0);

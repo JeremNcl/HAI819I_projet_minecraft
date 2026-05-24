@@ -62,6 +62,8 @@ float lastFrame = 0.0f;
 bool debugWireframe = false;
 bool usePbrShader = true;
 bool debugTBN = false;
+bool useNormalMap = true;
+bool debugDiffuseOnly = false;
 
 enum class TestSceneMode {
     SimpleSubChunk = 1,
@@ -377,6 +379,16 @@ int main(int argc, char** argv) {
                     printf("Debug TBN: %s\n", debugTBN ? "ON" : "OFF");
                 }
 
+                if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F8)) {
+                    useNormalMap = !useNormalMap;
+                    printf("Normal map: %s\n", useNormalMap ? "ON" : "OFF");
+                }
+
+                if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F7)) {
+                    debugDiffuseOnly = !debugDiffuseOnly;
+                    printf("Diffuse only: %s\n", debugDiffuseOnly ? "ON" : "OFF");
+                }
+
                 GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
                 BlockTextureManager::bindArrays(activeProgramID);
 
@@ -384,6 +396,16 @@ int main(int argc, char** argv) {
                 GLint debugLoc = glGetUniformLocation(activeProgramID, "debugTBN");
                 if (debugLoc >= 0) {
                     glUniform1i(debugLoc, debugTBN ? 1 : 0);
+                }
+
+                GLint useNormalMapLoc = glGetUniformLocation(activeProgramID, "useNormalMap");
+                if (useNormalMapLoc >= 0) {
+                    glUniform1i(useNormalMapLoc, useNormalMap ? 1 : 0);
+                }
+
+                GLint debugDiffuseOnlyLoc = glGetUniformLocation(activeProgramID, "debugDiffuseOnly");
+                if (debugDiffuseOnlyLoc >= 0) {
+                    glUniform1i(debugDiffuseOnlyLoc, debugDiffuseOnly ? 1 : 0);
                 }
 
                 renderSystem.update(registry, activeProgramID);
@@ -418,6 +440,16 @@ int main(int argc, char** argv) {
                 printf("Debug TBN: %s\n", debugTBN ? "ON" : "OFF");
             }
 
+            if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F8)) {
+                useNormalMap = !useNormalMap;
+                printf("Normal map: %s\n", useNormalMap ? "ON" : "OFF");
+            }
+
+            if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F7)) {
+                debugDiffuseOnly = !debugDiffuseOnly;
+                printf("Diffuse only: %s\n", debugDiffuseOnly ? "ON" : "OFF");
+            }
+
             GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
             BlockTextureManager::bindArrays(activeProgramID);
 
@@ -425,6 +457,16 @@ int main(int argc, char** argv) {
             GLint debugLoc = glGetUniformLocation(activeProgramID, "debugTBN");
             if (debugLoc >= 0) {
                 glUniform1i(debugLoc, debugTBN ? 1 : 0);
+            }
+
+            GLint useNormalMapLoc = glGetUniformLocation(activeProgramID, "useNormalMap");
+            if (useNormalMapLoc >= 0) {
+                glUniform1i(useNormalMapLoc, useNormalMap ? 1 : 0);
+            }
+
+            GLint debugDiffuseOnlyLoc = glGetUniformLocation(activeProgramID, "debugDiffuseOnly");
+            if (debugDiffuseOnlyLoc >= 0) {
+                glUniform1i(debugDiffuseOnlyLoc, debugDiffuseOnly ? 1 : 0);
             }
 
             renderSystem.update(registry, activeProgramID);

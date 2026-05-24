@@ -15,12 +15,15 @@ out vec4 FragColor;
 uniform sampler2DArray colorMap;
 uniform sampler2DArray normalMap;
 uniform sampler2DArray metallicMap;
+uniform float normalStrengths[5];
 
 // === PBR PARAMETERS ===
 uniform vec3 lightPos;
 uniform vec3 lightColor;
 uniform vec3 viewPos;
 uniform bool debugTBN;
+uniform bool useNormalMap;
+uniform bool debugDiffuseOnly;
 
 // === PBR CONSTANTS ===
 const float PI = 3.14159265359;
@@ -64,6 +67,11 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
     return ggx1 * ggx2;
 }
 
+float getNormalStrength(float sliceIndex) {
+    int slice = int(clamp(sliceIndex + 0.5, 0.0, 4.0));
+    return normalStrengths[slice];
+}
+
 void main() {
     // Sample textures using XYZ coordinates (Z is the texture index)
     vec3 uvw = fs_in.TexCoords;
@@ -81,10 +89,16 @@ void main() {
     // Correction de l'albedo (sRGB to Linear)
     albedo = pow(albedo, vec3(2.2));
     
-    // Convert normal map from [0,1] to [-1,1]
-    normal = normalize(normal * 2.0 - 1.0);
-    // Transform normal to world space using TBN
-    normal = normalize(fs_in.TBN * normal);
+    if (useNormalMap) {
+        // Convert normal map from [0,1] to [-1,1]
+        vec3 tangentNormal = normal * 2.0 - 1.0;
+        float normalStrength = getNormalStrength(uvw.z);
+        tangentNormal = normalize(mix(vec3(0.0, 0.0, 1.0), tangentNormal, normalStrength));
+        // Transform normal to world space using TBN
+        normal = normalize(fs_in.TBN * tangentNormal);
+    } else {
+        normal = normalize(fs_in.Normal);
+    }
     
     // DECODAGE FORMAT BEDROCK RTX (MER) :
     // R = Metallic, G = Emission, B = Roughness
@@ -132,6 +146,12 @@ void main() {
         
         float NdotL = max(dot(N, L), 0.0);
         Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+
+    if (debugDiffuseOnly) {
+        vec3 debugColor = albedo * (0.15 + 0.85 * max(dot(N, normalize(lightPos)), 0.0));
+        FragColor = vec4(pow(debugColor, vec3(1.0/2.2)), 1.0);
+        return;
     }
     
     // Ambient lighting (simple)
