@@ -11,6 +11,15 @@
 #include <queue>
 #include <mutex>
 
+#ifndef GLM_VEC3_HASH_DEFINED
+#define GLM_VEC3_HASH_DEFINED
+struct GLMVec3Hash {
+    std::size_t operator()(const glm::ivec3& k) const {
+        return std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1) ^ (std::hash<int>()(k.z) << 2);
+    }
+};
+#endif
+
 using subChunkCache = std::vector<const SubChunkComponent*>;
 
 struct Vertex {
@@ -58,4 +67,4 @@ private:
                  int axis,
                  glm::vec3 worldOffset);
 
-    VoxelType getVoxelGlobal(Registry& registry, const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const;};
+    VoxelType getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const;};

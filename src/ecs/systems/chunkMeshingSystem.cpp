@@ -2,7 +2,7 @@
 #include <algorithm>
 #include "engine/render/BlockTextureManager.hpp"
 
-VoxelType ChunkMeshingSystem::getVoxelGlobal(Registry& registry, const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const {
+VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const {
     if (x >= 0 && x < 16 && y >= 0 && y < 16 && z >= 0 && z < 16) {
         return voxelData.getVoxel(x, y, z);
     }
@@ -121,9 +121,9 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
     int dims[3] = {SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z};
 
     glm::vec3 worldOffset(
-        voxelData.subChunkPosition.x * SUBCHUNK_SIZE_X,
-        voxelData.subChunkPosition.y * SUBCHUNK_SIZE_Y,
-        voxelData.subChunkPosition.z * SUBCHUNK_SIZE_Z
+        voxelData.subChunkPosition.x * 16.f,
+        voxelData.subChunkPosition.y * 16.f,
+        voxelData.subChunkPosition.z * 16.f
     );
 
 
@@ -152,7 +152,7 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
                             int ny = x[1] + (isPositive ? q[1] : -q[1]);
                             int nz = x[2] + (isPositive ? q[2] : -q[2]);
 
-                            VoxelType neighbor = getVoxelGlobal(registry, voxelData, nx, ny, nz, cache);
+                            VoxelType neighbor = getVoxelGlobal(voxelData, nx, ny, nz, cache);
                             if (neighbor == VoxelType::AIR) {
                                 mask[x[u] + x[v] * dims[u]] = current;
                             } else {

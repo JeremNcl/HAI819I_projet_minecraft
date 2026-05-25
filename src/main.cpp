@@ -206,7 +206,7 @@ int main( void ) {
     registry.addComponent(camEntity, CameraComponent{ .isActive = true});
     registry.addComponent(camEntity, InputReceiverComponent{});
     registry.addComponent(camEntity, RigidBodyComponent{});
-    registry.addComponent(camEntity, VelocityComponent{});
+    registry.addComponent(camEntity, VelocityComponent{ .movementSpeed = 10.f});
     registry.addComponent(camEntity, ColliderComponent{
         glm::vec3(.6f, 1.8f, .6f),
         glm::vec3(0.f, .9f, 0.f)
