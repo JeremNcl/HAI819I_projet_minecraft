@@ -6,6 +6,6 @@
 namespace TestScenes {
     static WorldMapComponent& getOrCreateWorldMap(Registry& registry);
     void createSimpleChunk(Registry& registry);
-    void createTerrainChunk(Registry& registry);
-    void createDynamicTerrainScene(Registry& registry);
+    void createGeneratedChunk(Registry& registry);
+    void createInfiniteTerrainScene(Registry& registry);
 }

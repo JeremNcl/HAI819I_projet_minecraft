@@ -22,8 +22,8 @@ private:
     
     std::map<std::pair<int, int>, EntityID> activeChunks;
     
-    int renderDistance = 14;
-    int unloadDistance = 18;
+    int renderDistance = 4;
+    int unloadDistance = 6;
 
     void destroyChunkRecursive(Registry& registry, EntityID parentEntity) {
         if (registry.hasComponent<ChunkComponent>(parentEntity)) {
@@ -124,6 +124,7 @@ public:
                 for (int subY = 0; subY < 16; ++subY){
                     EntityID subChunkEntity = registry.createEntity();
                     SubChunkComponent subChunk(glm::ivec3(result.x, subY, result.z));
+                    subChunk.biomeColors = result.biomeColors;
                     int solidCount = 0;
 
                     for (int y = 0; y < 16; ++y) {

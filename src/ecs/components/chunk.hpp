@@ -37,11 +37,16 @@ struct SubChunkComponent : public Component {
     bool meshDirty = true;
 
     int solidBlockCount = 0;
+    std::array<glm::vec3, SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Z> biomeColors;
 
-    SubChunkComponent() : voxels(SUBVOXEL_ARRAY_SIZE, 0) {}
+    SubChunkComponent() : voxels(SUBVOXEL_ARRAY_SIZE, 0) {
+        biomeColors.fill(glm::vec3(1.0f));
+    }
 
     explicit SubChunkComponent(const glm::ivec3& pos)
-        : subChunkPosition(pos), voxels(SUBVOXEL_ARRAY_SIZE, 0) {}
+        : subChunkPosition(pos), voxels(SUBVOXEL_ARRAY_SIZE, 0) {
+        biomeColors.fill(glm::vec3(1.0f));
+    }
 
     inline size_t getIndex(int x, int y, int z) const {
         if (x < 0 || x >= SUBCHUNK_SIZE_X ||

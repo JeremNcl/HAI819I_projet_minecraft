@@ -59,7 +59,8 @@ void RenderSystem::renderMesh(GLuint shaderProgram,
                               const MeshComponent& mesh,
                               const glm::mat4& modelMatrix,
                               const glm::mat4& viewMatrix,
-                              const glm::mat4& projectionMatrix) {
+                              const glm::mat4& projectionMatrix,
+                              const glm::vec3& lightColor) {
     if (mesh.VAO == 0 || mesh.indexCount == 0) return;
 
     glm::mat4 MVP = projectionMatrix * viewMatrix * modelMatrix;
@@ -84,7 +85,6 @@ void RenderSystem::renderMesh(GLuint shaderProgram,
     GLint locLightPos = glGetUniformLocation(shaderProgram, "lightPos");
     GLint locLightColor = glGetUniformLocation(shaderProgram, "lightColor");
     glm::vec3 lightPos(128.0f, 400.0f, 128.0f); // Un beau soleil de midi
-    glm::vec3 lightColor(3.0f, 3.0f, 3.0f);   // Un peu plus fort
     glUniform3fv(locLightPos, 1, glm::value_ptr(lightPos));
     glUniform3fv(locLightColor, 1, glm::value_ptr(lightColor));
 
@@ -93,7 +93,7 @@ void RenderSystem::renderMesh(GLuint shaderProgram,
     glBindVertexArray(0);
 }
 
-void RenderSystem::update(Registry& registry, GLuint shaderProgram) {    
+void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::vec3& lightColor) {    
     auto view = registry.view<MeshComponent, TransformComponent>();
     Registry::View cameraView = registry.view<CameraComponent>();
 
@@ -161,7 +161,7 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram) {
 
     // 3. RENDU BATCHÉ
     for (const auto& node : visibleChunks) {
-        renderMesh(shaderProgram, locMVP, *node.mesh, glm::mat4(1.0f), camera->viewMatrix, camera->projectionMatrix);
+        renderMesh(shaderProgram, locMVP, *node.mesh, glm::mat4(1.0f), camera->viewMatrix, camera->projectionMatrix, lightColor);
     }
     
     glBindVertexArray(0);

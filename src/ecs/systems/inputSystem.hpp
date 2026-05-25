@@ -20,6 +20,7 @@ class InputSystem {
         void update(Registry& _registry, GLFWwindow* _windows);
 
         void setCursorMode(GLFWwindow* _windows, bool _locked);
+        void resetMouseTracking(GLFWwindow* window);
 };
 
 #endif

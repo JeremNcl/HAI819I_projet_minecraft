@@ -61,3 +61,15 @@ void InputSystem::setCursorMode(GLFWwindow* window, bool _locked) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
 }
+
+void InputSystem::resetMouseTracking(GLFWwindow* window) {
+    firstMouse = true;
+
+    int width = 0;
+    int height = 0;
+    glfwGetWindowSize(window, &width, &height);
+
+    if (width > 0 && height > 0) {
+        glfwSetCursorPos(window, width * 0.5, height * 0.5);
+    }
+}

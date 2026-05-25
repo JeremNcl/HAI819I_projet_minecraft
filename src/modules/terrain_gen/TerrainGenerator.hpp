@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <glm/glm.hpp>
 
 enum class BlockType : std::uint8_t {
     AIR = 0,
@@ -59,7 +60,7 @@ public:
     TerrainGenerator(const TerrainConfig& config);
     
     int GetIndex(int x, int y, int z) const;
-    std::array<std::vector<BlockType>, 16> GenerateChunk(int chunkX, int chunkZ);
+    std::array<std::vector<BlockType>, 16> GenerateChunk(int chunkX, int chunkZ, std::array<glm::vec3, CHUNK_WIDTH * CHUNK_DEPTH>* outBiomeColors = nullptr);
     
 private:
     int m_seed;
