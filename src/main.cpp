@@ -19,6 +19,7 @@ GLFWwindow* window;
 // Include GLM
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <thread>
 
 using namespace glm;
@@ -48,12 +49,14 @@ using namespace glm;
 #include "ecs/systems/cameraSystem.hpp"
 #include "ecs/systems/windowSystem.hpp"
 #include "ecs/systems/debugSystem.hpp"
+#include "ecs/systems/debugInputSystem.hpp"
 #include "ecs/systems/PathFindingSystem.hpp"
 #include "ecs/systems/TerrainSystem.hpp"
 
 //void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void MeshingWorkerThread(Registry& registry, TerrainSystem& terrain, ChunkMeshingSystem& meshing);
+
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -64,9 +67,18 @@ bool usePbrShader = true;
 bool debugTBN = false;
 bool useNormalMap = true;
 bool debugDiffuseOnly = false;
+bool useHemisphericalAmbient = true;
+bool useBakedAO = true;
+float aoStrength = 0.50f; // default blend between 1.0 and baked AO
 bool useReducedAmbient = false;
 
-static constexpr float kAmbientSoft = 0.045f;
+// Day / Night cycle (managed by DebugInputSystem)
+float dayTime = 0.0f;      // normalized [0,1]
+float daySpeed = 0.02f;    // units per second (fraction of day per second)
+bool dayPaused = false;
+
+// Ambient presets: SOFT gives higher ambient to reduce overall contrast
+static constexpr float kAmbientSoft = 0.055f;
 static constexpr float kAmbientCrisp = 0.035f;
 
 enum class TestSceneMode {
@@ -135,22 +147,151 @@ static void buildStaticSceneMeshes(Registry& registry, ChunkMeshingSystem& meshi
     }
 }
 
-static bool keyPressedOnce(GLFWwindow* _window, int key) {
-    static std::array<bool, GLFW_KEY_LAST + 1> previousState{};
-    bool isPressed = (glfwGetKey(_window, key) == GLFW_PRESS);
-    bool triggered = isPressed && !previousState[key];
-    previousState[key] = isPressed;
-    return triggered;
+
+// Derive day/night cycle parameters from normalized dayTime [0, 1]
+// dayTime: 0.0 = sunrise, 0.25 = noon, 0.5 = sunset, 0.75 = night, 1.0 = end of day
+
+static float computeAmbientStrengthFromTime(float t) {
+    // At night (t ~ 0.75): ~0.10 (darker)
+    // At day  (t ~ 0.25): base preset value
+    float nightDarkness = 0.10f;
+    float dayValue = useReducedAmbient ? kAmbientCrisp : kAmbientSoft;
+    
+    // Smoothly interpolate based on a sine curve (night is roughly t in [0.6, 1.0] and [0, 0.1])
+    float sunHeight = glm::sin(glm::pi<float>() * t); // 0 at t=0/1, 1 at t=0.5
+    return glm::mix(nightDarkness, dayValue, glm::clamp(sunHeight, 0.0f, 1.0f));
 }
 
-static float getAmbientStrength() {
-    return useReducedAmbient ? kAmbientCrisp : kAmbientSoft;
-}
-
-static glm::vec3 getLightColor() {
-    return useReducedAmbient
+static glm::vec3 computeLightColorFromTime(float t) {
+    // Warm orange at sunrise/sunset, white at noon, dim blue at night
+    float sunHeight = glm::sin(glm::pi<float>() * t);
+    
+    // Sunset/sunrise colors (orange/red)
+    glm::vec3 sunsetColor = glm::vec3(3.0f, 2.2f, 1.4f);
+    // Noon color (slightly warm white)
+    glm::vec3 noonColor = useReducedAmbient 
         ? glm::vec3(3.00f, 2.94f, 2.86f)
-        : glm::vec3(2.85f, 2.78f, 2.70f);
+        : glm::vec3(2.40f, 2.35f, 2.30f);
+    // Night color (very dim, bluish)
+    glm::vec3 nightColor = glm::vec3(0.1f, 0.15f, 0.25f);
+    
+    glm::vec3 color;
+    if (t < 0.25f) {
+        // Sunrise: night -> sunset
+        float fade = t / 0.25f;
+        color = glm::mix(nightColor, sunsetColor, fade);
+    } else if (t < 0.5f) {
+        // Morning to noon: sunset -> noon
+        float fade = (t - 0.25f) / 0.25f;
+        color = glm::mix(sunsetColor, noonColor, fade);
+    } else if (t < 0.75f) {
+        // Afternoon to sunset: noon -> sunset
+        float fade = (t - 0.5f) / 0.25f;
+        color = glm::mix(noonColor, sunsetColor, fade);
+    } else {
+        // Night: sunset -> night
+        float fade = (t - 0.75f) / 0.25f;
+        color = glm::mix(sunsetColor, nightColor, fade);
+    }
+    
+    // Modulate intensity by sun height (darker when below horizon)
+    color *= (0.3f + 0.7f * glm::clamp(sunHeight, 0.0f, 1.0f));
+    
+    return color;
+}
+
+static glm::vec3 computeAmbientSkyColorFromTime(float t) {
+    float sunHeight = glm::sin(glm::pi<float>() * t);
+    
+    // Day sky: blue
+    glm::vec3 daySky = useReducedAmbient ? glm::vec3(0.50f, 0.60f, 0.75f) : glm::vec3(0.60f, 0.68f, 0.85f);
+    // Sunset sky: orange/red
+    glm::vec3 sunsetSky = glm::vec3(0.8f, 0.5f, 0.3f);
+    // Night sky: dark blue/black
+    glm::vec3 nightSky = glm::vec3(0.05f, 0.08f, 0.15f);
+    
+    glm::vec3 color;
+    if (t < 0.25f) {
+        float fade = t / 0.25f;
+        color = glm::mix(nightSky, sunsetSky, fade);
+    } else if (t < 0.5f) {
+        float fade = (t - 0.25f) / 0.25f;
+        color = glm::mix(sunsetSky, daySky, fade);
+    } else if (t < 0.75f) {
+        float fade = (t - 0.5f) / 0.25f;
+        color = glm::mix(daySky, sunsetSky, fade);
+    } else {
+        float fade = (t - 0.75f) / 0.25f;
+        color = glm::mix(sunsetSky, nightSky, fade);
+    }
+    
+    return color;
+}
+
+static glm::vec3 computeAmbientGroundColorFromTime(float t) {
+    float sunHeight = glm::sin(glm::pi<float>() * t);
+    
+    // Day ground: brownish
+    glm::vec3 dayGround = useReducedAmbient ? glm::vec3(0.08f, 0.07f, 0.05f) : glm::vec3(0.12f, 0.10f, 0.08f);
+    // Sunset ground: warm reddish
+    glm::vec3 sunsetGround = glm::vec3(0.3f, 0.15f, 0.08f);
+    // Night ground: very dark blue
+    glm::vec3 nightGround = glm::vec3(0.02f, 0.02f, 0.05f);
+    
+    glm::vec3 color;
+    if (t < 0.25f) {
+        float fade = t / 0.25f;
+        color = glm::mix(nightGround, sunsetGround, fade);
+    } else if (t < 0.5f) {
+        float fade = (t - 0.25f) / 0.25f;
+        color = glm::mix(sunsetGround, dayGround, fade);
+    } else if (t < 0.75f) {
+        float fade = (t - 0.5f) / 0.25f;
+        color = glm::mix(dayGround, sunsetGround, fade);
+    } else {
+        float fade = (t - 0.75f) / 0.25f;
+        color = glm::mix(sunsetGround, nightGround, fade);
+    }
+    
+    return color;
+}
+
+// Compute sun light direction from dayTime
+// At t=0: sunrise east, t=0.25: noon overhead, t=0.5: sunset west, t=0.75: night below
+static glm::vec3 computeLightDirectionFromTime(float t) {
+    float angle = glm::pi<float>() * t; // 0 to 2*pi
+    float elevation = glm::sin(angle);  // sun height: -1 (bottom) to 1 (overhead) to -1
+    float azimuth = glm::cos(angle);    // horizontal position: 1 (east) to -1 (west)
+    
+    // Direction vector pointing from world toward sun
+    // At night (elevation < 0), keep light below horizon for realistic night
+    glm::vec3 direction = glm::normalize(glm::vec3(azimuth, elevation, 0.0f));
+    
+    // Ensure light direction is never pointing straight down (clamp elevation)
+    direction.y = glm::clamp(direction.y, -0.3f, 1.0f);
+    
+    return glm::normalize(direction);
+}
+
+
+static RenderDebugState getRenderDebugState() {
+    return RenderDebugState{
+        .usePbrShader = usePbrShader,
+        .debugTBN = debugTBN,
+        .useNormalMap = useNormalMap,
+        .debugDiffuseOnly = debugDiffuseOnly,
+        .useBakedAO = useBakedAO,
+        .useHemisphericalAmbient = useHemisphericalAmbient,
+        .useReducedAmbient = useReducedAmbient,
+        .ambientStrength = computeAmbientStrengthFromTime(dayTime),
+        .aoStrength = aoStrength,
+        .lightColor = computeLightColorFromTime(dayTime),
+        .ambientSkyColor = computeAmbientSkyColorFromTime(dayTime),
+        .ambientGroundColor = computeAmbientGroundColorFromTime(dayTime),
+        .dayTime = dayTime,
+        .daySpeed = daySpeed,
+        .dayPaused = dayPaused
+    };
 }
 
 static void applyActiveShaderUniforms(GLuint activeProgramID) {
@@ -169,9 +310,35 @@ static void applyActiveShaderUniforms(GLuint activeProgramID) {
         glUniform1i(debugDiffuseOnlyLoc, debugDiffuseOnly ? 1 : 0);
     }
 
+    GLint hemiAmbientLoc = glGetUniformLocation(activeProgramID, "useHemisphericalAmbient");
+    if (hemiAmbientLoc >= 0) {
+        glUniform1i(hemiAmbientLoc, useHemisphericalAmbient ? 1 : 0);
+    }
+
+    GLint bakedAOLoc = glGetUniformLocation(activeProgramID, "useBakedAO");
+    if (bakedAOLoc >= 0) {
+        glUniform1i(bakedAOLoc, useBakedAO ? 1 : 0);
+    }
+    GLint aoStrengthLoc = glGetUniformLocation(activeProgramID, "aoStrength");
+    if (aoStrengthLoc >= 0) {
+        glUniform1f(aoStrengthLoc, aoStrength);
+    }
+
     GLint ambientStrengthLoc = glGetUniformLocation(activeProgramID, "ambientStrength");
     if (ambientStrengthLoc >= 0) {
-        glUniform1f(ambientStrengthLoc, getAmbientStrength());
+        glUniform1f(ambientStrengthLoc, computeAmbientStrengthFromTime(dayTime));
+    }
+
+    GLint ambientSkyLoc = glGetUniformLocation(activeProgramID, "ambientSkyColor");
+    if (ambientSkyLoc >= 0) {
+        glm::vec3 sky = computeAmbientSkyColorFromTime(dayTime);
+        glUniform3fv(ambientSkyLoc, 1, glm::value_ptr(sky));
+    }
+
+    GLint ambientGroundLoc = glGetUniformLocation(activeProgramID, "ambientGroundColor");
+    if (ambientGroundLoc >= 0) {
+        glm::vec3 ground = computeAmbientGroundColorFromTime(dayTime);
+        glUniform3fv(ambientGroundLoc, 1, glm::value_ptr(ground));
     }
 }
 
@@ -203,6 +370,7 @@ int main(int argc, char** argv) {
     }
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
+    // Note: Key callbacks removed - using polling via DebugInputSystem instead
     
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
@@ -267,6 +435,7 @@ int main(int argc, char** argv) {
     WindowSystem windowSystem;
     CameraSystem cameraSystem;
     DebugSystem debugSystem;
+    DebugInputSystem debugInputSystem;
     
     // Systèmes du dev bonus
     TerrainConfig config = LoadConfig("config.txt");
@@ -281,7 +450,7 @@ int main(int argc, char** argv) {
     
     printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem).\n");
     printf("Caméra initialisée en mode FREE_CAMERA.\n");
-    printf("Contrôles: WASD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation, F6=ambiance\n");
+    printf("Contrôles: WASD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation, F4=AO, F5=hemi ambiant, F6=ambiance\n");
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     EntityID camEntity = registry.createEntity();
@@ -314,7 +483,7 @@ int main(int argc, char** argv) {
 
     printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem, InputSystem, CameraSystem).\n");
     printf("Caméra initialisée.\n");
-    printf("Contrôles: ZQSD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation, F6=ambiance\n");
+    printf("Contrôles: ZQSD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation, F4=AO, F5=hemi ambiant, F6=ambiance\n");
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     bool isLoading = useInfiniteTerrain;
@@ -338,6 +507,9 @@ int main(int argc, char** argv) {
         }
         lastFrame = currentFrame;
         
+
+        // Ensure GLFW processes events early so glfwGetKey states are fresh.
+        glfwPollEvents();
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -363,6 +535,9 @@ int main(int argc, char** argv) {
                 if (windowSystem.update(registry, window)) {
                     inputSystem.resetMouseTracking(window);
                 }
+                
+                // Handle debug inputs (day/night cycle, render toggles)
+                debugInputSystem.update(window, deltaTime);
 
                 int displayW, displayH;
                 glfwGetFramebufferSize(window, &displayW, &displayH);
@@ -404,33 +579,15 @@ int main(int argc, char** argv) {
                     inputSystem.resetMouseTracking(window);
                 }
                 pathFindingSystem.update(registry);
+                
+                // Handle debug inputs (day/night cycle, render toggles)
+                debugInputSystem.update(window, deltaTime);
 
-                if (keyPressedOnce(window, GLFW_KEY_F10)) {
-                    usePbrShader = !usePbrShader;
-                    printf("Mode rendu: %s\n", usePbrShader ? "PBR" : "BASIC");
-                }
-
-                if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F9)) {
-                    debugTBN = !debugTBN;
-                    printf("Debug TBN: %s\n", debugTBN ? "ON" : "OFF");
-                }
-
-                if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F8)) {
-                    useNormalMap = !useNormalMap;
-                    printf("Normal map: %s\n", useNormalMap ? "ON" : "OFF");
-                }
-
-                if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F7)) {
-                    debugDiffuseOnly = !debugDiffuseOnly;
-                    printf("Diffuse only: %s\n", debugDiffuseOnly ? "ON" : "OFF");
-                }
-
-                if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F6)) {
-                    useReducedAmbient = !useReducedAmbient;
-                    printf("Ambient preset: %s (ambient=%.3f, lightColor=%.2f %.2f %.2f)\n",
-                           useReducedAmbient ? "CRISP" : "SOFT",
-                           getAmbientStrength(),
-                           getLightColor().r, getLightColor().g, getLightColor().b);
+                if (!dayPaused) {
+                    dayTime = std::fmod(dayTime + daySpeed * deltaTime, 1.0f);
+                    if (dayTime < 0.0f) {
+                        dayTime += 1.0f;
+                    }
                 }
 
                 GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
@@ -439,7 +596,7 @@ int main(int argc, char** argv) {
                 glUseProgram(activeProgramID);
                 applyActiveShaderUniforms(activeProgramID);
 
-                renderSystem.update(registry, activeProgramID, getLightColor());
+                renderSystem.update(registry, activeProgramID, computeLightColorFromTime(dayTime), computeLightDirectionFromTime(dayTime));
                 
                 if (debugWireframe) {
                     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -448,7 +605,7 @@ int main(int argc, char** argv) {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
                 ImGui_ImplOpenGL3_NewFrame();
-                debugSystem.update(registry, window, deltaTime);
+                debugSystem.update(registry, window, deltaTime, getRenderDebugState());
                 
                 glDisable(GL_DEPTH_TEST);
                 ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -461,32 +618,15 @@ int main(int argc, char** argv) {
                 inputSystem.resetMouseTracking(window);
             }
 
-            if (keyPressedOnce(window, GLFW_KEY_F10)) {
-                usePbrShader = !usePbrShader;
-                printf("Mode rendu: %s\n", usePbrShader ? "PBR" : "BASIC");
-            }
+            // Handle debug inputs (day/night cycle, render toggles, AO adjustments)
+            debugInputSystem.update(window, deltaTime);
 
-            if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F9)) {
-                debugTBN = !debugTBN;
-                printf("Debug TBN: %s\n", debugTBN ? "ON" : "OFF");
-            }
-
-            if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F8)) {
-                useNormalMap = !useNormalMap;
-                printf("Normal map: %s\n", useNormalMap ? "ON" : "OFF");
-            }
-
-            if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F7)) {
-                debugDiffuseOnly = !debugDiffuseOnly;
-                printf("Diffuse only: %s\n", debugDiffuseOnly ? "ON" : "OFF");
-            }
-
-            if (usePbrShader && keyPressedOnce(window, GLFW_KEY_F6)) {
-                useReducedAmbient = !useReducedAmbient;
-                printf("Ambient preset: %s (ambient=%.3f, lightColor=%.2f %.2f %.2f)\n",
-                       useReducedAmbient ? "CRISP" : "SOFT",
-                       getAmbientStrength(),
-                       getLightColor().r, getLightColor().g, getLightColor().b);
+            // Update day/night cycle
+            if (!dayPaused) {
+                dayTime = std::fmod(dayTime + daySpeed * deltaTime, 1.0f);
+                if (dayTime < 0.0f) {
+                    dayTime += 1.0f;
+                }
             }
 
             GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
@@ -495,7 +635,7 @@ int main(int argc, char** argv) {
             glUseProgram(activeProgramID);
             applyActiveShaderUniforms(activeProgramID);
 
-            renderSystem.update(registry, activeProgramID, getLightColor());
+            renderSystem.update(registry, activeProgramID, computeLightColorFromTime(dayTime), computeLightDirectionFromTime(dayTime));
             
             if (debugWireframe) {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -504,7 +644,7 @@ int main(int argc, char** argv) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
             ImGui_ImplOpenGL3_NewFrame();
-            debugSystem.update(registry, window, deltaTime);
+            debugSystem.update(registry, window, deltaTime, getRenderDebugState());
             
             glDisable(GL_DEPTH_TEST);
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -512,7 +652,8 @@ int main(int argc, char** argv) {
         }
 
         glfwSwapBuffers(window);
-        glfwPollEvents();
+        // NOTE: glfwPollEvents() already called at frame start (line 579)
+        // Calling it again here resets key states and breaks checkKeyEdge tracking
 
     } 
     while( (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) && (glfwWindowShouldClose(window) == 0) );

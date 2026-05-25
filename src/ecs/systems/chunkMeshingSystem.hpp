@@ -28,6 +28,7 @@ struct Vertex {
     glm::vec3 tangent;
     glm::vec3 bitangent;
     glm::vec3 biomeColor;
+    float ao;
 };
 
 struct MeshData {
@@ -68,10 +69,23 @@ private:
                  float texIndex,
                  int axis,
                  bool isPositive,
+                 float ao0,
+                 float ao1,
+                 float ao2,
+                 float ao3,
                  glm::vec3 worldOffset,
-                 const SubChunkComponent& voxelData);
+                 const SubChunkComponent& voxelData,
+                 const subChunkCache& cache);
 
     VoxelType getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const;
     glm::vec3 sampleBiomeColor(const SubChunkComponent& voxelData, const glm::vec3& localPos) const;
+    float sampleVertexAO(const SubChunkComponent& voxelData,
+                         const subChunkCache& cache,
+                         const glm::ivec3& basePos,
+                         const glm::ivec3& normalDir,
+                         const glm::ivec3& uDir,
+                         const glm::ivec3& vDir,
+                         int uSign,
+                         int vSign) const;
     
 };

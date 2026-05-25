@@ -1,0 +1,82 @@
+1. Étapes : 
+
+    Phase 1 - Stabilisation base éclairage (bloquant) [COMPLÉTÉ]
+
+1. ✅ Appliquer l'AO sur l'ambient (et une très faible part indirecte éventuelle), pas sur toute la lumière.
+
+2. ✅ Ajouter un paramètre aoStrength réglable.
+
+3. ✅ Recalibrer les presets SOFT/CRISP après ce changement.
+
+4. ✅ Afficher dans le debug l'intensité AO et son mode d'application.
+
+    Phase 2 - Cycle jour/nuit V1 (dépend de 1) [COMPLÉTÉ]
+
+5. ✅ Introduire dayTime normalisé [0,1] avec vitesse réglable.
+
+6. ✅ Dériver light direction, lightColor, ambientStrength, ambientSkyColor, ambientGroundColor depuis dayTime.
+
+7. ✅ Ajouter toggles runtime: ON/OFF, vitesse, pause.
+
+8. ✅ Brancher ces valeurs dans la boucle principale et les uniforms existants.
+
+8b. ✅ Affichage HH:MM du cycle jour/nuit dans ImGui debug.
+
+8c. ✅ Inputs avec repeat support (flèches directionnelles) pour debug/iteration rapide.
+
+    Phase 2.5 - Améliorations visuelles du contraste (dépend de 2, optionnel avant 3)
+
+NOTE: Le rendu actuel a un contraste limité car:
+- Une face est éclairée par le soleil directionnel, les autres faces uniquement par l'ambient
+- Pas de shadow mapping → ombres ne sont pas visibles, grottes reçoivent la lumière directe
+
+Solutions futures recommandées:
+
+8d. Ajouter une skybox dynamique qui change couleur avec dayTime (ground reflection bonus)
+
+8e. Améliorer l'ambient hemispherique: ajouter bounce du sol vers le ciel (2-pass indirect)
+
+8f. Optionnel: explorer IBL (Image-Based Lighting) avec cubemap dynamique
+
+    Phase 3 - Tonemapping/exposition (partiellement parallèle avec 2, validation finale dépend de 2) [EN COURS]
+
+9. Ajouter exposure uniforme avant gamma.
+
+10. Optionnel recommandé: passer vers ACES-like simple.
+
+11. Recalibrer les moments clé (midi, coucher, nuit).
+
+    Phase 4 - Ombres directionnelles (dépend de 2 et 3) [CRITIQUE POUR VISIBILITÉ]
+
+JUSTIFICATION: Actuellement, les grottes et blocs occludés reçoivent la lumière directe
+car il n'y a pas de vérification d'occlusion. Phase 4 résout cela via shadow mapping.
+
+12. Créer depth pass (depuis la perspective du soleil)
+
+13. Générer shadow map pour le dayTime actuel
+
+14. Implémenter PCF (Percentage Closer Filtering) dans fragment shader
+
+15. Coupler la matrice de projection lumière au cycle jour/nuit (matrice suit le soleil)
+
+16. Ajouter un mode debug: visualiser la shadow map
+
+17. Valider: grottes noires, reliefs marqués, soft shadows sur les bords
+
+    Phase 5 - POM ciblé (dépend de 1 minimum, recommandé après 4)
+
+18. Ajouter une vraie source de hauteur par matériau.
+
+19. Intégrer POM tangent space via TBN existant.
+
+20. Limiter le coût avec steps adaptatifs angle/distance.
+
+21. Activer d'abord sur peu de matériaux (stone/brick) avec toggle.
+
+    Phase 6 - Finition/perf (dépend de 1-5)
+
+22. Mesurer coûts sur scènes ARGS 1/2/3.
+
+23. Vérifier disparition coutures AO/coins instables.
+
+24. Définir profils qualité/perf (fallback sans POM, shadows simples).

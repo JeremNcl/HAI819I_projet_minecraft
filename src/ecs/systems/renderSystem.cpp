@@ -60,7 +60,8 @@ void RenderSystem::renderMesh(GLuint shaderProgram,
                               const glm::mat4& modelMatrix,
                               const glm::mat4& viewMatrix,
                               const glm::mat4& projectionMatrix,
-                              const glm::vec3& lightColor) {
+                              const glm::vec3& lightColor,
+                              const glm::vec3& lightDirection) {
     if (mesh.VAO == 0 || mesh.indexCount == 0) return;
 
     glm::mat4 MVP = projectionMatrix * viewMatrix * modelMatrix;
@@ -84,8 +85,7 @@ void RenderSystem::renderMesh(GLuint shaderProgram,
 
     GLint locLightPos = glGetUniformLocation(shaderProgram, "lightPos");
     GLint locLightColor = glGetUniformLocation(shaderProgram, "lightColor");
-    glm::vec3 lightPos(128.0f, 400.0f, 128.0f); // Un beau soleil de midi
-    glUniform3fv(locLightPos, 1, glm::value_ptr(lightPos));
+    glUniform3fv(locLightPos, 1, glm::value_ptr(lightDirection));
     glUniform3fv(locLightColor, 1, glm::value_ptr(lightColor));
 
     glBindVertexArray(mesh.VAO);
@@ -93,7 +93,7 @@ void RenderSystem::renderMesh(GLuint shaderProgram,
     glBindVertexArray(0);
 }
 
-void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::vec3& lightColor) {    
+void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::vec3& lightColor, const glm::vec3& lightDirection) {    
     auto view = registry.view<MeshComponent, TransformComponent>();
     Registry::View cameraView = registry.view<CameraComponent>();
 
@@ -161,7 +161,7 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::v
 
     // 3. RENDU BATCHÉ
     for (const auto& node : visibleChunks) {
-        renderMesh(shaderProgram, locMVP, *node.mesh, glm::mat4(1.0f), camera->viewMatrix, camera->projectionMatrix, lightColor);
+        renderMesh(shaderProgram, locMVP, *node.mesh, glm::mat4(1.0f), camera->viewMatrix, camera->projectionMatrix, lightColor, lightDirection);
     }
     
     glBindVertexArray(0);
