@@ -9,6 +9,7 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <iostream>
 
 // Sparse set storage for a single component type
 class ComponentStorage {
@@ -77,8 +78,7 @@ public:
 
     const T& get(EntityID entity) const {
         auto it = sparse.find(entity);
-        if (it == sparse.end()) {
-            throw std::out_of_range("Entity does not have this component");
+        if (it == sparse.end()) {;
         }
         return components[it->second];
     }

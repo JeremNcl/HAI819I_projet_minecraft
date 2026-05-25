@@ -5,7 +5,6 @@
 #include "ecs/components/transform.hpp"
 #include "ecs/components/mesh.hpp"
 #include "ecs/components/camera.hpp"
-#include "ecs/components/world.hpp"
 #include "modules/ChunkWorker.hpp"
 #include <map>
 #include <utility>
@@ -69,7 +68,7 @@ public:
         return true;
     }
 
-    void update(Registry& registry, WorldMapComponent& worldMap) {
+    void update(Registry& registry) {
         glm::vec3 playerPos(0.0f);
         bool foundPlayer = false;
         
@@ -166,8 +165,6 @@ public:
                     registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f,0.0f,0.0f)));
                     
                     chunkManager.subChunks[subY] = subChunkEntity;
-
-                    worldMap.subChunkEntities[subChunk.subChunkPosition] = subChunkEntity;
                     
                     if (solidCount > 0) {
                         registry.getComponent<SubChunkComponent>(subChunkEntity).meshDirty = true;

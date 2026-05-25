@@ -337,7 +337,7 @@ void ChunkMeshingSystem::uploadMeshToGPU(MeshComponent& mesh, const MeshData& da
             voxelData.meshDirty = false;
              */
 
-void ChunkMeshingSystem::update(Registry& registry, const WorldMapComponent& worldMap) {
+void ChunkMeshingSystem::update(Registry& registry) {
     std::lock_guard<std::mutex> lock(uploadMutex);
     
     int uploadsThisFrame = 0;

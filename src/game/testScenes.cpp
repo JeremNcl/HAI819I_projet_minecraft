@@ -7,22 +7,9 @@
 
 namespace TestScenes {
 
-static WorldMapComponent& getOrCreateWorldMap(Registry& registry) {
-    auto view = registry.view<WorldMapComponent>();
-    for (EntityID entity : view) {
-        return registry.getComponent<WorldMapComponent>(entity);
-    }
-    
-    EntityID worldEntity = registry.createEntity();
-    registry.addComponent(worldEntity, WorldMapComponent());
-    return registry.getComponent<WorldMapComponent>(worldEntity);
-}
-
 void createSimpleChunk(Registry& registry) {
     printf("=== TEST SCENE: Simple Chunk ===\n");
     printf("Creating a single chunk parent with 16 SubChunks...\n");
-
-    WorldMapComponent& worldMap = getOrCreateWorldMap(registry);
 
     const glm::vec3 testBiomeColor(0.48f, 0.74f, 0.42f);
     
@@ -55,8 +42,6 @@ void createSimpleChunk(Registry& registry) {
         registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f, 0.0f, 0.0f)));
         
         chunkManager.subChunks[subY] = subChunkEntity;
-
-        worldMap.subChunkEntities[subChunkData.subChunkPosition] = subChunkEntity;
     }
     
     chunkManager.isFullyGenerated = true;
@@ -68,8 +53,6 @@ void createGeneratedChunk(Registry& registry) {
     TerrainConfig config;
     TerrainGenerator generator(config);
     const glm::vec3 testBiomeColor(0.48f, 0.74f, 0.42f);
-
-    WorldMapComponent& worldMap = getOrCreateWorldMap(registry);
 
     int chunksGenerated = 0;
     int radius = 5;
@@ -115,11 +98,6 @@ void createGeneratedChunk(Registry& registry) {
 void createInfiniteTerrainScene(Registry& registry) {
     printf("=== TEST SCENE: Infinite Terrain (TerrainSystem + PathFinding) ===\n");
     printf("Chunks will be generated on-demand by TerrainSystem.\n");
-    
-    // Empty scene - chunks will be generated dynamically by TerrainSystem
-    // during the ECS update loop
-
-    getOrCreateWorldMap(registry);
 }
 
 }  // namespace TestScenes

@@ -42,7 +42,6 @@ using namespace glm;
 #include "ecs/components/chunk.hpp"
 #include "ecs/components/camera.hpp"
 #include "ecs/components/inputReceiver.hpp"
-#include "ecs/components/world.hpp"
 #include "ecs/components/deltaTime.hpp"
 #include "ecs/systems/chunkMeshingSystem.hpp"
 #include "ecs/systems/renderSystem.hpp"
@@ -246,15 +245,7 @@ int main(int argc, char** argv) {
     
     Registry registry;
     
-    
-    // CREATION DU COMPONENT UNIQUE WORLDMAP
-    auto worldMapView = registry.view<WorldMapComponent>();
-    if (worldMapView.isEmpty()) {
-        EntityID worldEntity = registry.createEntity();
-        registry.addComponent(worldEntity, WorldMapComponent());
-        worldMapView = registry.view<WorldMapComponent>();
-    }
-    WorldMapComponent& worldMap = registry.getComponent<WorldMapComponent>(*worldMapView.begin());
+
 
     auto deltaTimeView = registry.view<DeltaTimeComponent>();
     if (deltaTimeView.isEmpty()) {
@@ -308,7 +299,17 @@ int main(int argc, char** argv) {
 
     cameraSystem.initCamera(registry, camEntity, 90, 0, glm::vec3(0,1.8,0));
     
-    //positionCameraForScene(registry, camEntity, selectedScene);
+    EntityID spectatorCamera = registry.createEntity();
+    registry.addComponent(spectatorCamera, CameraComponent{});
+    registry.addComponent(spectatorCamera, TransformComponent{
+        glm::vec3(50,100,50),
+        glm::vec3(0,0,0)
+    });
+    registry.addComponent(spectatorCamera, InputReceiverComponent{});
+    registry.addComponent(spectatorCamera, VelocityComponent{ .movementSpeed = 6.f}); //définit la speed camSpec ici si besoin
+
+    //positionCameraForScene(registry, spectatorCamera, selectedScene);
+    cameraSystem.initCamera(registry, spectatorCamera, 90, 0, glm::vec3(0,0,0));
 
     if (selectedScene == TestSceneMode::SimpleSubChunk) {
         TestScenes::createSimpleChunk(registry);
@@ -356,8 +357,8 @@ int main(int argc, char** argv) {
         if (useInfiniteTerrain) {
             {
                 std::lock_guard<std::mutex> lock(ecsMutex);
-                terrainSystem.update(registry, worldMap);
-                meshingSystem.update(registry, worldMap);
+                terrainSystem.update(registry);
+                meshingSystem.update(registry);
             }
 
             int totalExpectedMeshes = TARGET_CHUNKS * 16;
@@ -393,7 +394,7 @@ int main(int argc, char** argv) {
                     
                 movementSystem.update(registry, deltaTime);
                 physicsSystem.update(registry, deltaTime);
-                collisionSystem.update(registry, worldMap, deltaTime);
+                collisionSystem.update(registry, deltaTime);
 
                 pathFindingSystem.update(registry);
 
@@ -421,14 +422,14 @@ int main(int argc, char** argv) {
             }
         } else {
             inputSystem.update(registry, window);
-            cameraSystem.update(registry, deltaTime);
             if (windowSystem.update(registry, window)) {
                 inputSystem.resetMouseTracking(window);
             }   
 
             movementSystem.update(registry, deltaTime);
             physicsSystem.update(registry, deltaTime);
-            collisionSystem.update(registry, worldMap, deltaTime);
+            collisionSystem.update(registry, deltaTime);
+            cameraSystem.update(registry, deltaTime);
             
             pathFindingSystem.update(registry);
         
@@ -454,7 +455,7 @@ int main(int argc, char** argv) {
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
             glEnable(GL_DEPTH_TEST);
         }
-       
+
         glfwSwapBuffers(window);
         glfwPollEvents();
 

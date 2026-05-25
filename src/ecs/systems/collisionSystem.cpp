@@ -1,8 +1,33 @@
 #include "collisionSystem.hpp"
 #include <iostream>
 
+VoxelType CollisionSystem::getVoxelAt(int x, int y, int z) const {
+    int chunkX = std::floor(static_cast<float>(x) / 16.0f);
+    int chunkY = std::floor(static_cast<float>(y) / 16.0f);
+    int chunkZ = std::floor(static_cast<float>(z) / 16.0f);
+
+    if (chunkY < 0 || chunkY >= 16) return VoxelType::AIR;
+
+    glm::ivec3 targetPos(chunkX, chunkY, chunkZ);
+
+    auto it = subChunkMap.find(targetPos);
+    if (it != subChunkMap.end()) {
+
+        int localX = (x % 16 + 16) % 16;
+        int localY = (y % 16 + 16) % 16;
+        int localZ = (z % 16 + 16) % 16;
+        return it->second->getVoxel(localX, localY, localZ);
+    }
+
+    return VoxelType::AIR;
+}
+
+bool CollisionSystem::isVoxelSolid(VoxelType type) const {
+    return type != VoxelType::AIR && type != VoxelType::WATER && type != VoxelType::LAVA;
+}
+
 bool CollisionSystem::checkAABBCollision(Registry& _registry, const glm::vec3& _pos,
-    const ColliderComponent& _collider, const WorldMapComponent& _worldMap) const {
+    const ColliderComponent& _collider) const {
 
     glm::vec3 minBox = _pos + _collider.offset - (_collider.size * .5f);
     glm::vec3 maxBox = _pos + _collider.offset + (_collider.size * .5f);
@@ -27,7 +52,7 @@ bool CollisionSystem::checkAABBCollision(Registry& _registry, const glm::vec3& _
     for (int x = minX; x <= maxX; ++x) {
         for (int y = minY; y <= maxY; ++y) {
             for (int z = minZ; z <= maxZ; ++z) {
-                if (_worldMap.isVoxelSolid(_registry, x, y, z)) {
+                if (isVoxelSolid(getVoxelAt(x, y, z))) {
                     return true;
                 }
             }
@@ -36,7 +61,14 @@ bool CollisionSystem::checkAABBCollision(Registry& _registry, const glm::vec3& _
     return false;
 }
 
-void CollisionSystem::update(Registry& _registry, const WorldMapComponent& _worldMap, float _deltaTime) {
+void CollisionSystem::update(Registry& _registry, float _deltaTime) {
+
+    subChunkMap.clear();
+    auto subChunkView = _registry.view<SubChunkComponent>();
+    for (EntityID entity : subChunkView) {
+        const auto& subChunk = _registry.getComponent<SubChunkComponent>(entity);
+        subChunkMap[subChunk.subChunkPosition] = &subChunk;
+    }
 
     Registry::View3<VelocityComponent, ColliderComponent, TransformComponent> view = _registry.view<VelocityComponent, ColliderComponent, TransformComponent>();
 
@@ -52,7 +84,7 @@ void CollisionSystem::update(Registry& _registry, const WorldMapComponent& _worl
 
         // AXE Y
         pos.y += velocity.velocity.y * _deltaTime;
-        if (checkAABBCollision(_registry, pos, collider, _worldMap)) {
+        if (checkAABBCollision(_registry, pos, collider)) {
             if (velocity.velocity.y > 0.0f) {
                 float maxY = pos.y + collider.offset.y + collider.size.y * 0.5f;
                 pos.y = std::floor(maxY) - (collider.offset.y + collider.size.y * 0.5f) - EPSILON_POSITION;
@@ -65,7 +97,7 @@ void CollisionSystem::update(Registry& _registry, const WorldMapComponent& _worl
 
         // AXE X
         pos.x += velocity.velocity.x * _deltaTime;
-        if (checkAABBCollision(_registry, pos, collider, _worldMap)) {
+        if (checkAABBCollision(_registry, pos, collider)) {
             if (velocity.velocity.x > 0.0f) {
                 float maxX = pos.x + collider.offset.x + collider.size.x * 0.5f;
                 pos.x = std::floor(maxX) - (collider.offset.x + collider.size.x * 0.5f) - EPSILON_POSITION;
@@ -78,7 +110,7 @@ void CollisionSystem::update(Registry& _registry, const WorldMapComponent& _worl
 
         // AXE Z
         pos.z += velocity.velocity.z * _deltaTime;
-        if (checkAABBCollision(_registry, pos, collider, _worldMap)) {
+        if (checkAABBCollision(_registry, pos, collider)) {
             if (velocity.velocity.z > 0.0f) {
                 float maxZ = pos.z + collider.offset.z + collider.size.z * 0.5f;
                 pos.z = std::floor(maxZ) - (collider.offset.z + collider.size.z * 0.5f) - EPSILON_POSITION;
@@ -98,7 +130,7 @@ void CollisionSystem::update(Registry& _registry, const WorldMapComponent& _worl
             } else {
                 glm::vec3 groundCheck = pos;
                 groundCheck.y -= FALL_Y_EPSILON;
-                rigidBody->isGrounded = checkAABBCollision(_registry, groundCheck, collider, _worldMap);
+                rigidBody->isGrounded = checkAABBCollision(_registry, groundCheck, collider);
             }
         }
     }

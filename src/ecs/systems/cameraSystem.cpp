@@ -2,6 +2,32 @@
 
 void CameraSystem::update(Registry& _registry, float _deltaTime) {
 
+    Registry::View2<CameraComponent, InputReceiverComponent> inputView = _registry.view<CameraComponent, InputReceiverComponent>();
+    EntityID toDeactivate = 0;
+    EntityID toActivate = 0;
+
+    for (EntityID entity : inputView) {
+        auto& input = _registry.getComponent<InputReceiverComponent>(entity);
+        auto& cam = _registry.getComponent<CameraComponent>(entity);
+
+        if (cam.isActive && input.toggleCameraSwap) {
+            toDeactivate = entity;
+            
+            for (EntityID other : inputView) {
+                if (other != entity) {
+                    toActivate = other;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    if (toDeactivate != 0 && toActivate != 0) {
+        _registry.getComponent<CameraComponent>(toDeactivate).isActive = false;
+        _registry.getComponent<CameraComponent>(toActivate).isActive = true;
+    }
+
     Registry::View2<CameraComponent, TransformComponent> view = _registry.view<CameraComponent, TransformComponent>();
 
     for (EntityID entity : view) {
@@ -9,7 +35,7 @@ void CameraSystem::update(Registry& _registry, float _deltaTime) {
         TransformComponent& transform = _registry.getComponent<TransformComponent>(entity);
         CameraComponent& camera = _registry.getComponent<CameraComponent>(entity);
 
-        if (_registry.hasComponent<InputReceiverComponent>(entity)) {
+        if (camera.isActive && _registry.hasComponent<InputReceiverComponent>(entity)) {
             InputReceiverComponent& input = _registry.getComponent<InputReceiverComponent>(entity);
             
             camera.yaw += input.mouseX * camera.mouseSensitivity;

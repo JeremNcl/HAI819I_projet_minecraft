@@ -15,6 +15,14 @@ struct InputReceiverComponent : public Component {
     bool sprint = false;
 
     bool toggleFullscreen = false;
+    bool toggleWireframe = false;
+    bool togglePbr = false;
+    bool toggleTBN = false;
+    bool toggleNormalMap = false;
+    bool toggleDiffuse = false;
+    bool toggleAmbient = false;
+    
+    bool toggleCameraSwap = false;
 
     double mouseX = 0.;
     double mouseY = 0.;

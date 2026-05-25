@@ -7,6 +7,13 @@ InputSystem::InputSystem(GLFWwindow* _window){
     lastY = height * .5f;
 }
 
+bool InputSystem::keyPressedOnce(GLFWwindow* _window, int _key) {
+    bool isPressed = (glfwGetKey(_window, _key) == GLFW_PRESS);
+    bool triggered = isPressed && !m_previousState[_key];
+    m_previousState[_key] = isPressed;
+    return triggered;
+}
+
 void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
 
     Registry::View<InputReceiverComponent> view = _registry.view<InputReceiverComponent>();
@@ -26,6 +33,16 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
     lastX = mouseX;
     lastY = mouseY;
 
+    bool toggleFullscreen  = keyPressedOnce(_window, GLFW_KEY_F11);
+    bool toggleWireframe  = keyPressedOnce(_window, GLFW_KEY_F5);
+    bool togglePbr = keyPressedOnce(_window, GLFW_KEY_F10);
+    bool toggleTBN = keyPressedOnce(_window, GLFW_KEY_F9);
+    bool toggleNormalMap  = keyPressedOnce(_window, GLFW_KEY_F8);
+    bool toggleDiffuse = keyPressedOnce(_window, GLFW_KEY_F7);
+    bool toggleAmbient = keyPressedOnce(_window, GLFW_KEY_F6);
+
+    bool toggleCameraSwap = keyPressedOnce(_window, GLFW_KEY_F4);
+
     bool f11Pressed = (glfwGetKey(_window, GLFW_KEY_F11) == GLFW_PRESS);
 
     for (EntityID entity : view) {
@@ -39,11 +56,14 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         input.jump = (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS);
         input.sprint = (glfwGetKey(_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
 
-        if (f11Pressed && !f11PressedLastFrame) {
-            input.toggleFullscreen = true;
-        } else {
-            input.toggleFullscreen = false;
-        }
+        input.toggleFullscreen = toggleFullscreen;
+        input.toggleWireframe = toggleWireframe;
+        input.togglePbr = togglePbr;
+        input.toggleTBN = toggleTBN;
+        input.toggleNormalMap = toggleNormalMap;
+        input.toggleDiffuse = toggleDiffuse;
+        input.toggleAmbient = toggleAmbient;
+        input.toggleCameraSwap = toggleCameraSwap;
 
         input.mouseX = deltaX;
         input.mouseY = deltaY;

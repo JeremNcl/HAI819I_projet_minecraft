@@ -1,36 +1,39 @@
 #include "debugSystem.hpp"
 
-bool DebugSystem::keyPressedOnce(GLFWwindow* _window, int _key){
-    bool isPressed = (glfwGetKey(_window, _key) == GLFW_PRESS);
-    bool triggered = isPressed && !m_previousState[_key];
-    m_previousState[_key] = isPressed;
-    return triggered;
-}
-
 void DebugSystem::update(Registry& _registry, GLFWwindow* _window, float _deltaTime, float _rawDeltaTime) {
-    if (keyPressedOnce(_window, GLFW_KEY_F10)) {
-        m_usePbrShader = !m_usePbrShader;
-        std::cout << "Mode rendu: " << (m_usePbrShader ? "PBR" : "BASIC") << std::endl;
+    
+    Registry::View view = _registry.view<InputReceiverComponent>();
+    for (EntityID entity : view) {
+
+        InputReceiverComponent& input = _registry.getComponent<InputReceiverComponent>(entity);
+        
+        if (input.togglePbr) {
+            m_usePbrShader = !m_usePbrShader;
+            std::cout << "Mode rendu: " << (m_usePbrShader ? "PBR" : "BASIC") << std::endl;
+        }
+        if (m_usePbrShader && input.toggleTBN) {
+            m_debugTBN = !m_debugTBN;
+            std::cout << "Debug TBN: " << (m_debugTBN ? "ON" : "OFF") << std::endl;
+        }
+        if (m_usePbrShader && input.toggleNormalMap) {
+            m_useNormalMap = !m_useNormalMap;
+            std::cout << "Normal map: " << (m_useNormalMap ? "ON" : "OFF") << std::endl;
+        }
+        if (m_usePbrShader && input.toggleDiffuse) {
+            m_debugDiffuseOnly = !m_debugDiffuseOnly;
+            std::cout << "Diffuse only: " << (m_debugDiffuseOnly ? "ON" : "OFF") << std::endl;
+        }
+        if (input.toggleAmbient) {
+            m_useReducedAmbient = !m_useReducedAmbient;
+            std::cout << "Ambient preset: " << (m_useReducedAmbient ? "CRISP" : "SOFT") << std::endl;
+        }
+        if (input.toggleWireframe) {
+            m_debugWireframe = !m_debugWireframe;
+            std::cout << "Mode Wireframe: " << (m_debugWireframe ? "ON" : "OFF") << std::endl;
+        }
     }
-    if (m_usePbrShader && keyPressedOnce(_window, GLFW_KEY_F9)) {
-        m_debugTBN = !m_debugTBN;
-        std::cout << "Debug TBN: " << (m_debugTBN ? "ON" : "OFF") << std::endl;
-    }
-    if (m_usePbrShader && keyPressedOnce(_window, GLFW_KEY_F8)) {
-        m_useNormalMap = !m_useNormalMap;
-        std::cout << "Normal map: " << (m_useNormalMap ? "ON" : "OFF") << std::endl;
-    }
-    if (m_usePbrShader && keyPressedOnce(_window, GLFW_KEY_F7)) {
-        m_debugDiffuseOnly = !m_debugDiffuseOnly;
-        std::cout << "Diffuse only: " << (m_debugDiffuseOnly ? "ON" : "OFF") << std::endl;
-    }
-    if (m_usePbrShader && keyPressedOnce(_window, GLFW_KEY_F6)) {
-        m_useReducedAmbient = !m_useReducedAmbient;
-        std::cout << "Ambient preset: " << (m_useReducedAmbient ? "CRISP" : "SOFT") << std::endl;
-    }
-    if (keyPressedOnce(_window, GLFW_KEY_F5)) {
-        m_debugWireframe = !m_debugWireframe;
-    }
+
+    
 
     // 2. Mettre à jour ImGui IO
     int displayW, displayH;

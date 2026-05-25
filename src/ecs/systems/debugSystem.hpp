@@ -5,6 +5,7 @@
 #include "ecs/registry.hpp"
 #include "ecs/components/camera.hpp"
 #include "ecs/components/transform.hpp"
+#include "ecs/components/inputReceiver.hpp"
 
 #include <imgui.h>
 #include <GLFW/glfw3.h>

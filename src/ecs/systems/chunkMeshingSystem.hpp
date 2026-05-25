@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ecs/registry.hpp"
-#include "../components/world.hpp"
 #include "ecs/components/chunk.hpp"
 #include "ecs/components/mesh.hpp"
 #include "ecs/components/transform.hpp"
@@ -45,7 +44,7 @@ class ChunkMeshingSystem {
 public:
     ChunkMeshingSystem() = default;
 
-    void update(Registry& registry, const WorldMapComponent& worldMap);
+    void update(Registry& registry);
     bool isMeshingComplete(Registry& registry) const;
     int getCompletedMeshCount(Registry& registry) const;
 
