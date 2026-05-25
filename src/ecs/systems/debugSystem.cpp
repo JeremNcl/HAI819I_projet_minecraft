@@ -58,6 +58,7 @@ void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTim
         ImGui::Text("F9 Debug TBN: %s", renderState.debugTBN ? "ON" : "OFF");
         ImGui::SliderFloat("AO Strength", &aoStrength, 0.0f, 1.0f);
         ImGui::Text("Ambient strength: %.3f", renderState.ambientStrength);
+        ImGui::Text("Exposure: %.3f", renderState.exposure);
         ImGui::Text("Light color: (%.2f, %.2f, %.2f)", renderState.lightColor.x, renderState.lightColor.y, renderState.lightColor.z);
         ImGui::Text("Sky ambient: (%.2f, %.2f, %.2f)", renderState.ambientSkyColor.x, renderState.ambientSkyColor.y, renderState.ambientSkyColor.z);
         ImGui::Text("Ground ambient: (%.2f, %.2f, %.2f)", renderState.ambientGroundColor.x, renderState.ambientGroundColor.y, renderState.ambientGroundColor.z);

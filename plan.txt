@@ -40,7 +40,7 @@ Solutions futures recommandées:
 
     Phase 3 - Tonemapping/exposition (partiellement parallèle avec 2, validation finale dépend de 2) [EN COURS]
 
-9. Ajouter exposure uniforme avant gamma.
+9. ✅ Ajouter exposure uniforme avant gamma.
 
 10. Optionnel recommandé: passer vers ACES-like simple.
 

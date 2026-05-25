@@ -43,6 +43,7 @@ using namespace glm;
 #include "ecs/components/chunk.hpp"
 #include "ecs/components/camera.hpp"
 #include "ecs/components/inputReceiver.hpp"
+#include "ecs/components/skyboxComponent.hpp"
 #include "ecs/systems/chunkMeshingSystem.hpp"
 #include "ecs/systems/renderSystem.hpp"
 #include "ecs/systems/inputSystem.hpp"
@@ -50,6 +51,7 @@ using namespace glm;
 #include "ecs/systems/windowSystem.hpp"
 #include "ecs/systems/debugSystem.hpp"
 #include "ecs/systems/debugInputSystem.hpp"
+#include "ecs/systems/skyboxSystem.hpp"
 #include "ecs/systems/PathFindingSystem.hpp"
 #include "ecs/systems/TerrainSystem.hpp"
 
@@ -151,126 +153,192 @@ static void buildStaticSceneMeshes(Registry& registry, ChunkMeshingSystem& meshi
 // Derive day/night cycle parameters from normalized dayTime [0, 1]
 // dayTime: 0.0 = sunrise, 0.25 = noon, 0.5 = sunset, 0.75 = night, 1.0 = end of day
 
-static float computeAmbientStrengthFromTime(float t) {
-    // At night (t ~ 0.75): ~0.10 (darker)
-    // At day  (t ~ 0.25): base preset value
-    float nightDarkness = 0.10f;
-    float dayValue = useReducedAmbient ? kAmbientCrisp : kAmbientSoft;
-    
-    // Smoothly interpolate based on a sine curve (night is roughly t in [0.6, 1.0] and [0, 0.1])
-    float sunHeight = glm::sin(glm::pi<float>() * t); // 0 at t=0/1, 1 at t=0.5
-    return glm::mix(nightDarkness, dayValue, glm::clamp(sunHeight, 0.0f, 1.0f));
+static float inverseLerp(float a, float b, float v) {
+    return glm::clamp((v - a) / (b - a), 0.0f, 1.0f);
+}
+
+// Fonction utilitaire pour synchroniser parfaitement l'angle physique du soleil avec les couleurs de la skybox
+static float getSunAngle(float t) {
+    float sunrise = 0.20f; // Heure exacte du lever
+    float sunset = 0.80f;  // Heure exacte du coucher
+    float dayDuration = sunset - sunrise;
+    float nightDuration = 1.0f - dayDuration;
+
+    if (t >= sunrise && t <= sunset) {
+        // Le jour, l'angle va de 0 à PI
+        float t_mapped = (t - sunrise) / dayDuration;
+        return t_mapped * glm::pi<float>();
+    } else {
+        // La nuit, l'angle va de PI à 2*PI
+        float t_mapped;
+        if (t > sunset) t_mapped = (t - sunset) / nightDuration;
+        else t_mapped = (t + 1.0f - sunset) / nightDuration;
+        return glm::pi<float>() + t_mapped * glm::pi<float>();
+    }
 }
 
 static glm::vec3 computeLightColorFromTime(float t) {
-    // Warm orange at sunrise/sunset, white at noon, dim blue at night
-    float sunHeight = glm::sin(glm::pi<float>() * t);
-    
-    // Sunset/sunrise colors (orange/red)
-    glm::vec3 sunsetColor = glm::vec3(3.0f, 2.2f, 1.4f);
-    // Noon color (slightly warm white)
-    glm::vec3 noonColor = useReducedAmbient 
-        ? glm::vec3(3.00f, 2.94f, 2.86f)
-        : glm::vec3(2.40f, 2.35f, 2.30f);
-    // Night color (very dim, bluish)
-    glm::vec3 nightColor = glm::vec3(0.1f, 0.15f, 0.25f);
-    
+    glm::vec3 dayLight    = useReducedAmbient ? glm::vec3(3.0f, 2.9f, 2.8f) : glm::vec3(2.5f, 2.4f, 2.3f);
+    glm::vec3 sunsetLight = glm::vec3(2.5f, 1.2f, 0.4f); 
+    glm::vec3 duskLight   = glm::vec3(0.8f, 0.2f, 0.2f); 
+    glm::vec3 nightLight  = glm::vec3(0.15f, 0.20f, 0.35f); 
+
     glm::vec3 color;
-    if (t < 0.25f) {
-        // Sunrise: night -> sunset
-        float fade = t / 0.25f;
-        color = glm::mix(nightColor, sunsetColor, fade);
-    } else if (t < 0.5f) {
-        // Morning to noon: sunset -> noon
-        float fade = (t - 0.25f) / 0.25f;
-        color = glm::mix(sunsetColor, noonColor, fade);
-    } else if (t < 0.75f) {
-        // Afternoon to sunset: noon -> sunset
-        float fade = (t - 0.5f) / 0.25f;
-        color = glm::mix(noonColor, sunsetColor, fade);
-    } else {
-        // Night: sunset -> night
-        float fade = (t - 0.75f) / 0.25f;
-        color = glm::mix(sunsetColor, nightColor, fade);
+    // On aligne les couleurs sur le lever (0.20) et coucher (0.80)
+    if (t < 0.150f) color = nightLight;
+    else if (t < 0.200f) color = glm::mix(nightLight, duskLight, inverseLerp(0.150f, 0.200f, t));
+    else if (t < 0.250f) color = glm::mix(duskLight, dayLight, inverseLerp(0.200f, 0.250f, t));
+    else if (t < 0.750f) color = dayLight;
+    else if (t < 0.800f) color = glm::mix(dayLight, sunsetLight, inverseLerp(0.750f, 0.800f, t));
+    else if (t < 0.850f) color = glm::mix(sunsetLight, nightLight, inverseLerp(0.800f, 0.850f, t));
+    else color = nightLight;
+
+    // --- L'ASTUCE ANTI-POP ---
+    float angle = getSunAngle(t);
+    float elevation = glm::sin(angle);
+    
+    // smoothstep crée un multiplicateur qui vaut 0.0 à l'horizon (elevation = 0) 
+    // et monte à 1.0 dès que le soleil s'élève un peu (0.15).
+    float horizonFade = glm::smoothstep(0.0f, 0.15f, glm::abs(elevation));
+    
+    return color * horizonFade;
+}
+
+static glm::vec3 computeLightDirectionFromTime(float t) {
+    float angle = getSunAngle(t);
+    
+    float elevation = glm::sin(angle);  
+    float azimuth = glm::cos(angle);    
+    
+    glm::vec3 direction = glm::normalize(glm::vec3(azimuth, elevation, 0.0f));
+    
+    // L'inversion se fait maintenant dans l'obscurité totale grâce au horizonFade !
+    if (elevation < 0.0f) {
+        direction = -direction;
     }
     
-    // Modulate intensity by sun height (darker when below horizon)
-    color *= (0.3f + 0.7f * glm::clamp(sunHeight, 0.0f, 1.0f));
+    direction.y = glm::max(direction.y, 0.05f);
+    return glm::normalize(direction);
+}
+
+static float computeAmbientStrengthFromTime(float t) {
+    float nightDarkness = 0.10f;
+    float dayValue = useReducedAmbient ? kAmbientCrisp : kAmbientSoft;
     
-    return color;
+    // Nuit
+    if (t < 0.175f) return nightDarkness;
+    // Aube (Fade in)
+    if (t < 0.250f) return glm::mix(nightDarkness, dayValue, inverseLerp(0.175f, 0.250f, t));
+    // Jour
+    if (t < 0.750f) return dayValue;
+    // Crépuscule (Fade out)
+    if (t < 0.825f) return glm::mix(dayValue, nightDarkness, inverseLerp(0.750f, 0.825f, t));
+    // Nuit
+    return nightDarkness;
 }
 
 static glm::vec3 computeAmbientSkyColorFromTime(float t) {
-    float sunHeight = glm::sin(glm::pi<float>() * t);
+    // --- 1. COULEURS (Standards PBR / Rayleigh) ---
+    // Bleu Rayleigh (Plein jour : bleu azur réaliste)
+    glm::vec3 daySky     = useReducedAmbient ? glm::vec3(0.15f, 0.35f, 0.75f) : glm::vec3(0.25f, 0.45f, 0.85f); 
+    // Golden Hour (Soleil rasant, lumière douce)
+    glm::vec3 goldenHour = glm::vec3(0.85f, 0.60f, 0.30f); 
+    // Coucher de soleil (Orange soutenu par la dispersion)
+    glm::vec3 sunset     = glm::vec3(0.90f, 0.35f, 0.15f); 
+    // Crépuscule/Aube (Rouge profond avant la nuit noire)
+    glm::vec3 redDusk    = glm::vec3(0.55f, 0.10f, 0.15f); 
+    // Nuit claire (PBR : pas totalement noir, diffusion stellaire/lunaire)
+    glm::vec3 nightSky   = glm::vec3(0.005f, 0.015f, 0.04f); 
+
+    // --- 2. TIMINGS (Standard Voxel : 50% Jour, 35% Nuit, 15% Transitions) ---
+    // t=0.5 est le zénith absolu (midi). 
+    // Jour :        [0.250, 0.750] (50%)
+    // Crépuscule :  [0.750, 0.825] (7.5%)
+    // Nuit :        [0.825, 1.000] et [0.000, 0.175] (35%)
+    // Aube :        [0.175, 0.250] (7.5%)
+
+    // Nuit (Minuit -> Fin de nuit)
+    if (t < 0.175f) return nightSky; 
     
-    // Day sky: blue
-    glm::vec3 daySky = useReducedAmbient ? glm::vec3(0.50f, 0.60f, 0.75f) : glm::vec3(0.60f, 0.68f, 0.85f);
-    // Sunset sky: orange/red
-    glm::vec3 sunsetSky = glm::vec3(0.8f, 0.5f, 0.3f);
-    // Night sky: dark blue/black
-    glm::vec3 nightSky = glm::vec3(0.05f, 0.08f, 0.15f);
+    // Aube (Transition rapide de 7.5%)
+    if (t < 0.200f) return glm::mix(nightSky, redDusk, inverseLerp(0.175f, 0.200f, t));
+    if (t < 0.225f) return glm::mix(redDusk, goldenHour, inverseLerp(0.200f, 0.225f, t));
+    if (t < 0.250f) return glm::mix(goldenHour, daySky, inverseLerp(0.225f, 0.250f, t));
     
-    glm::vec3 color;
-    if (t < 0.25f) {
-        float fade = t / 0.25f;
-        color = glm::mix(nightSky, sunsetSky, fade);
-    } else if (t < 0.5f) {
-        float fade = (t - 0.25f) / 0.25f;
-        color = glm::mix(sunsetSky, daySky, fade);
-    } else if (t < 0.75f) {
-        float fade = (t - 0.5f) / 0.25f;
-        color = glm::mix(daySky, sunsetSky, fade);
-    } else {
-        float fade = (t - 0.75f) / 0.25f;
-        color = glm::mix(sunsetSky, nightSky, fade);
-    }
+    // Plein Jour (50% du cycle)
+    if (t < 0.750f) return daySky; 
     
-    return color;
+    // Crépuscule (Transition rapide de 7.5%)
+    if (t < 0.775f) return glm::mix(daySky, goldenHour, inverseLerp(0.750f, 0.775f, t));
+    if (t < 0.800f) return glm::mix(goldenHour, sunset, inverseLerp(0.775f, 0.800f, t));
+    if (t < 0.825f) return glm::mix(sunset, redDusk, inverseLerp(0.800f, 0.825f, t));
+    
+    // Nuit (Début de nuit -> Fade vers noir profond)
+    if (t <= 1.0f) return glm::mix(redDusk, nightSky, inverseLerp(0.825f, 0.850f, t)); // Le fade s'arrête à 0.85, le reste est nightSky
+    
+    return nightSky;
+}
+
+static glm::vec3 computeHorizonColorFromTime(float t) {
+    // Teintes spécifiques pour la brume à l'horizon
+    glm::vec3 dayHorizon     = useReducedAmbient ? glm::vec3(0.40f, 0.50f, 0.65f) : glm::vec3(0.65f, 0.75f, 0.85f); // Brume bleutée claire
+    glm::vec3 goldenHorizon  = glm::vec3(0.95f, 0.75f, 0.45f); // Horizon lumineux et doré
+    glm::vec3 sunsetHorizon  = glm::vec3(0.95f, 0.40f, 0.10f); // Horizon "en feu"
+    glm::vec3 duskHorizon    = glm::vec3(0.40f, 0.15f, 0.20f); // Brume pourpre/rouge
+    glm::vec3 nightHorizon   = glm::vec3(0.02f, 0.04f, 0.08f); // Nuit (légèrement plus clair que le zénith)
+
+    // Les mêmes timings stricts que pour le Zénith
+    if (t < 0.175f) return nightHorizon; 
+    
+    if (t < 0.200f) return glm::mix(nightHorizon, duskHorizon, inverseLerp(0.175f, 0.200f, t));
+    if (t < 0.225f) return glm::mix(duskHorizon, goldenHorizon, inverseLerp(0.200f, 0.225f, t));
+    if (t < 0.250f) return glm::mix(goldenHorizon, dayHorizon, inverseLerp(0.225f, 0.250f, t));
+    
+    if (t < 0.750f) return dayHorizon; 
+    
+    if (t < 0.775f) return glm::mix(dayHorizon, goldenHorizon, inverseLerp(0.750f, 0.775f, t));
+    if (t < 0.800f) return glm::mix(goldenHorizon, sunsetHorizon, inverseLerp(0.775f, 0.800f, t));
+    if (t < 0.825f) return glm::mix(sunsetHorizon, duskHorizon, inverseLerp(0.800f, 0.825f, t));
+    
+    if (t <= 1.0f) return glm::mix(duskHorizon, nightHorizon, inverseLerp(0.825f, 0.850f, t)); 
+    
+    return nightHorizon;
 }
 
 static glm::vec3 computeAmbientGroundColorFromTime(float t) {
-    float sunHeight = glm::sin(glm::pi<float>() * t);
+    // Teintes du sol sous le monde (doit correspondre aux couleurs de l'air pour la skybox)
+    glm::vec3 dayGround    = useReducedAmbient ? glm::vec3(0.08f, 0.07f, 0.05f) : glm::vec3(0.12f, 0.10f, 0.08f);
+    glm::vec3 sunsetGround = glm::vec3(0.18f, 0.10f, 0.06f);
+    glm::vec3 nightGround  = glm::vec3(0.01f, 0.015f, 0.02f);
+
+    if (t < 0.175f) return nightGround;
+    if (t < 0.250f) return glm::mix(nightGround, dayGround, inverseLerp(0.175f, 0.250f, t));
+    if (t < 0.750f) return dayGround;
+    if (t < 0.825f) return glm::mix(dayGround, sunsetGround, inverseLerp(0.750f, 0.825f, t));
+    if (t <= 1.0f)  return glm::mix(sunsetGround, nightGround, inverseLerp(0.825f, 0.850f, t));
     
-    // Day ground: brownish
-    glm::vec3 dayGround = useReducedAmbient ? glm::vec3(0.08f, 0.07f, 0.05f) : glm::vec3(0.12f, 0.10f, 0.08f);
-    // Sunset ground: warm reddish
-    glm::vec3 sunsetGround = glm::vec3(0.3f, 0.15f, 0.08f);
-    // Night ground: very dark blue
-    glm::vec3 nightGround = glm::vec3(0.02f, 0.02f, 0.05f);
-    
-    glm::vec3 color;
-    if (t < 0.25f) {
-        float fade = t / 0.25f;
-        color = glm::mix(nightGround, sunsetGround, fade);
-    } else if (t < 0.5f) {
-        float fade = (t - 0.25f) / 0.25f;
-        color = glm::mix(sunsetGround, dayGround, fade);
-    } else if (t < 0.75f) {
-        float fade = (t - 0.5f) / 0.25f;
-        color = glm::mix(dayGround, sunsetGround, fade);
-    } else {
-        float fade = (t - 0.75f) / 0.25f;
-        color = glm::mix(sunsetGround, nightGround, fade);
-    }
-    
-    return color;
+    return nightGround;
 }
 
-// Compute sun light direction from dayTime
-// At t=0: sunrise east, t=0.25: noon overhead, t=0.5: sunset west, t=0.75: night below
-static glm::vec3 computeLightDirectionFromTime(float t) {
-    float angle = glm::pi<float>() * t; // 0 to 2*pi
-    float elevation = glm::sin(angle);  // sun height: -1 (bottom) to 1 (overhead) to -1
-    float azimuth = glm::cos(angle);    // horizontal position: 1 (east) to -1 (west)
+static float computeExposureFromTime(float t) {
+    // Calcul de l'élévation du soleil (1.0 = zénith, 0.0 = horizon, -1.0 = minuit)
+    float angle = (t - 0.25f) * 2.0f * glm::pi<float>();
+    float elevation = glm::sin(angle);
     
-    // Direction vector pointing from world toward sun
-    // At night (elevation < 0), keep light below horizon for realistic night
-    glm::vec3 direction = glm::normalize(glm::vec3(azimuth, elevation, 0.0f));
+    float noonExposure = 0.8f;      // Assombrit le plein jour pour éviter que le blanc grille
+    float twilightExposure = 1.2f;  // Éclaircit légèrement au coucher du soleil
+    float nightExposure = 1.8f;     // Pousse l'exposition à fond la nuit pour voir quelque chose
     
-    // Ensure light direction is never pointing straight down (clamp elevation)
-    direction.y = glm::clamp(direction.y, -0.3f, 1.0f);
-    
-    return glm::normalize(direction);
+    if (elevation > 0.1f) {
+        // Jour (le soleil est haut)
+        return glm::mix(twilightExposure, noonExposure, inverseLerp(0.1f, 1.0f, elevation));
+    } else if (elevation > -0.1f) {
+        // Horizon (Aube / Crépuscule)
+        return glm::mix(nightExposure, twilightExposure, inverseLerp(-0.1f, 0.1f, elevation));
+    } else {
+        // Nuit (le soleil est sous l'horizon)
+        return glm::mix(nightExposure, 2.2f, inverseLerp(-0.1f, -1.0f, elevation));
+    }
 }
 
 
@@ -285,9 +353,11 @@ static RenderDebugState getRenderDebugState() {
         .useReducedAmbient = useReducedAmbient,
         .ambientStrength = computeAmbientStrengthFromTime(dayTime),
         .aoStrength = aoStrength,
+        .exposure = computeExposureFromTime(dayTime),
         .lightColor = computeLightColorFromTime(dayTime),
         .ambientSkyColor = computeAmbientSkyColorFromTime(dayTime),
         .ambientGroundColor = computeAmbientGroundColorFromTime(dayTime),
+        .horizonColor = computeHorizonColorFromTime(dayTime),
         .dayTime = dayTime,
         .daySpeed = daySpeed,
         .dayPaused = dayPaused
@@ -339,6 +409,11 @@ static void applyActiveShaderUniforms(GLuint activeProgramID) {
     if (ambientGroundLoc >= 0) {
         glm::vec3 ground = computeAmbientGroundColorFromTime(dayTime);
         glUniform3fv(ambientGroundLoc, 1, glm::value_ptr(ground));
+    }
+
+    GLint exposureLoc = glGetUniformLocation(activeProgramID, "exposure");
+    if (exposureLoc >= 0) {
+        glUniform1f(exposureLoc, computeExposureFromTime(dayTime));
     }
 }
 
@@ -436,6 +511,7 @@ int main(int argc, char** argv) {
     CameraSystem cameraSystem;
     DebugSystem debugSystem;
     DebugInputSystem debugInputSystem;
+    SkyboxSystem skyboxSystem;
     
     // Systèmes du dev bonus
     TerrainConfig config = LoadConfig("config.txt");
@@ -463,6 +539,16 @@ int main(int argc, char** argv) {
 
     cameraSystem.initCamera(registry, camEntity, 90, 0);
     positionCameraForScene(registry, camEntity, selectedScene);
+
+    // Create skybox entity
+    EntityID skyboxEntity = registry.createEntity();
+    skyboxSystem.initialize();
+    registry.addComponent(skyboxEntity, SkyboxComponent{ .VAO = 0, .VBO = 0, .EBO = 0, .indexCount = 36 });
+    registry.addComponent(skyboxEntity, TransformComponent{
+        glm::vec3(0, 0, 0),
+        glm::vec3(0, 0, 0)
+    });
+    skyboxSystem.initializeSkyboxGeometry(registry, skyboxEntity);
 
     if (selectedScene == TestSceneMode::SimpleSubChunk) {
         TestScenes::createSimpleChunk(registry);
@@ -596,7 +682,11 @@ int main(int argc, char** argv) {
                 glUseProgram(activeProgramID);
                 applyActiveShaderUniforms(activeProgramID);
 
+                // On dessine d'abord le terrain
                 renderSystem.update(registry, activeProgramID, computeLightColorFromTime(dayTime), computeLightDirectionFromTime(dayTime));
+                
+                // On dessine la skybox après pour profiter du Early-Z culling
+                skyboxSystem.update(registry, getRenderDebugState());
                 
                 if (debugWireframe) {
                     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -635,7 +725,11 @@ int main(int argc, char** argv) {
             glUseProgram(activeProgramID);
             applyActiveShaderUniforms(activeProgramID);
 
+            // On dessine d'abord le terrain
             renderSystem.update(registry, activeProgramID, computeLightColorFromTime(dayTime), computeLightDirectionFromTime(dayTime));
+
+            // On dessine la skybox après
+            skyboxSystem.update(registry, getRenderDebugState());
             
             if (debugWireframe) {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

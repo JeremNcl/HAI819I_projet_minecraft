@@ -20,9 +20,11 @@ struct RenderDebugState {
     bool useReducedAmbient = false;
     float ambientStrength = 0.0f;
     float aoStrength = 0.0f;
+    float exposure = 1.0f;
     glm::vec3 lightColor{0.0f};
     glm::vec3 ambientSkyColor{0.0f};
     glm::vec3 ambientGroundColor{0.0f};
+    glm::vec3 horizonColor{0.0f};
     float dayTime = 0.0f;
     float daySpeed = 0.0f;
     bool dayPaused = false;

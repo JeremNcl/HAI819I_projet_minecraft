@@ -32,6 +32,7 @@ uniform float aoStrength; // 0.0 = no AO effect, 1.0 = full baked AO influence i
 uniform bool debugTBN;
 uniform bool useNormalMap;
 uniform bool debugDiffuseOnly;
+uniform float exposure; // Dynamic exposure for tone mapping
 
 const float HEMISPHERE_BLEND = 0.35;
 
@@ -193,6 +194,9 @@ void main() {
     
     // Ajout de l'émission (pour les blocs lumineux)
     color += albedo * emission * 5.0;
+    
+    // Apply dynamic exposure before tone mapping
+    color *= exposure;
     
     // Tone mapping (Reinhard)
     color = color / (color + vec3(1.0));
