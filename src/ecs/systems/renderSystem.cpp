@@ -54,47 +54,8 @@ bool RenderSystem::isAABBInFrustum(const glm::vec3& min, const glm::vec3& max, c
     return true;
 }
 
-void RenderSystem::renderMesh(GLuint shaderProgram,
-                              GLint locMVP,
-                              const MeshComponent& mesh,
-                              const glm::mat4& modelMatrix,
-                              const glm::mat4& viewMatrix,
-                              const glm::mat4& projectionMatrix,
-                              const glm::vec3& lightColor) {
-    if (mesh.VAO == 0 || mesh.indexCount == 0) return;
-
-    glm::mat4 MVP = projectionMatrix * viewMatrix * modelMatrix;
-    glUniformMatrix4fv(locMVP, 1, GL_FALSE, glm::value_ptr(MVP));
-
-    glm::mat3 normalMatrix = glm::mat3(glm::transpose(glm::inverse(modelMatrix)));
-
-    GLint locModel = glGetUniformLocation(shaderProgram, "model");
-    GLint locView = glGetUniformLocation(shaderProgram, "view");
-    GLint locProjection = glGetUniformLocation(shaderProgram, "projection");
-    GLint locNormalMatrix = glGetUniformLocation(shaderProgram, "normalMatrix");
-
-    glUniformMatrix4fv(locModel, 1, GL_FALSE, glm::value_ptr(modelMatrix));
-    glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(viewMatrix));
-    glUniformMatrix4fv(locProjection, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
-    glUniformMatrix3fv(locNormalMatrix, 1, GL_FALSE, glm::value_ptr(normalMatrix));
-
-    GLint locViewPos = glGetUniformLocation(shaderProgram, "viewPos");
-    glm::vec3 viewPos = glm::vec3(glm::inverse(viewMatrix)[3]);
-    glUniform3fv(locViewPos, 1, glm::value_ptr(viewPos));
-
-    GLint locLightPos = glGetUniformLocation(shaderProgram, "lightPos");
-    GLint locLightColor = glGetUniformLocation(shaderProgram, "lightColor");
-    glm::vec3 lightPos(128.0f, 400.0f, 128.0f); // Un beau soleil de midi
-    glUniform3fv(locLightPos, 1, glm::value_ptr(lightPos));
-    glUniform3fv(locLightColor, 1, glm::value_ptr(lightColor));
-
-    glBindVertexArray(mesh.VAO);
-    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mesh.indexCount), GL_UNSIGNED_INT, nullptr);
-    glBindVertexArray(0);
-}
-
 void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::vec3& lightColor) {    
-    auto view = registry.view<MeshComponent, TransformComponent>();
+    auto view = registry.view<MeshComponent, TransformComponent, SubChunkComponent>();
     Registry::View cameraView = registry.view<CameraComponent>();
 
     if (cameraView.isEmpty()) return;
@@ -121,10 +82,33 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::v
     if (!camera) return;
 
     glUseProgram(shaderProgram);
-    GLint locMVP = glGetUniformLocation(shaderProgram, "MVP");
+
+    if (programUniformsCache.find(shaderProgram) == programUniformsCache.end()) {
+        programUniformsCache[shaderProgram] = cacheUniformLocations(shaderProgram);
+    }
     
+    const ShaderUniforms& uniforms = programUniformsCache[shaderProgram];
+
+
+
+    glm::mat4 modelMatrix = glm::mat4(1.0f);
     glm::mat4 vpMatrix = camera->projectionMatrix * camera->viewMatrix;
-    glUniformMatrix4fv(locMVP, 1, GL_FALSE, glm::value_ptr(vpMatrix));
+    glm::mat3 normalMatrix = glm::mat3(1.0f);
+
+    glUniformMatrix4fv(uniforms.mvp, 1, GL_FALSE, glm::value_ptr(vpMatrix));
+    glUniformMatrix4fv(uniforms.model, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+    glUniformMatrix4fv(uniforms.view, 1, GL_FALSE, glm::value_ptr(camera->viewMatrix));
+    glUniformMatrix4fv(uniforms.projection, 1, GL_FALSE, glm::value_ptr(camera->projectionMatrix));
+    glUniformMatrix3fv(uniforms.normalMatrix, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+
+    glm::vec3 viewPos = glm::vec3(glm::inverse(camera->viewMatrix)[3]);
+    glUniform3fv(uniforms.viewPos, 1, glm::value_ptr(viewPos));
+
+    glm::vec3 lightPos(128.0f, 400.0f, 128.0f);
+    glUniform3fv(uniforms.lightPos, 1, glm::value_ptr(lightPos));
+    glUniform3fv(uniforms.lightColor, 1, glm::value_ptr(lightColor));
+
+
 
     std::array<glm::vec4, 6> frustumPlanes;
     extractFrustumPlanes(vpMatrix, frustumPlanes);
@@ -161,7 +145,8 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::v
 
     // 3. RENDU BATCHÉ
     for (const auto& node : visibleChunks) {
-        renderMesh(shaderProgram, locMVP, *node.mesh, glm::mat4(1.0f), camera->viewMatrix, camera->projectionMatrix, lightColor);
+        glBindVertexArray(node.mesh->VAO);
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(node.mesh->indexCount), GL_UNSIGNED_INT, nullptr);
     }
     
     glBindVertexArray(0);
