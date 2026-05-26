@@ -13,8 +13,19 @@ void PlayerMovementSystem::update(Registry& _registry, float _deltaTime) {
         if (camera.isActive) {
             glm::vec3 moveDir(0.0f);
 
-            if (input.moveForward)  moveDir += camera.front;
-            if (input.moveBackward) moveDir -= camera.front;
+            bool hasRigidBody = _registry.hasComponent<RigidBodyComponent>(entity);
+
+            glm::vec3 forward = camera.front;
+
+            if (hasRigidBody) {
+                forward.y = 0.f;
+                if (glm::length(forward) > 0.f) {
+                    forward = glm::normalize(forward);
+                }
+            }
+
+            if (input.moveForward)  moveDir += forward;
+            if (input.moveBackward) moveDir -= forward;
             if (input.moveLeft)     moveDir -= camera.right;
             if (input.moveRight)    moveDir += camera.right;
 
@@ -26,8 +37,6 @@ void PlayerMovementSystem::update(Registry& _registry, float _deltaTime) {
             if (input.sprint) currentSpeed *= velocity.sprintMultiplier;
 
             if (_registry.hasComponent<RigidBodyComponent>(entity)) {
-
-                moveDir.y = 0.0f;
 
                 velocity.velocity.x = moveDir.x * currentSpeed;
                 velocity.velocity.z = moveDir.z * currentSpeed;

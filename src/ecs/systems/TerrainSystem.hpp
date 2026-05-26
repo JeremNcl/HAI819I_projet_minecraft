@@ -253,6 +253,14 @@ public:
     if (mySubID == 0) return;
 
     auto& mySub = registry.getComponent<SubChunkComponent>(mySubID);
+
+    /* VoxelType oldType = mySub.getVoxel(localX, localY, localZ);
+    if (oldType != VoxelType::AIR && type == VoxelType::AIR) {
+        mySub.solidBlockCount--;
+    } else if (oldType == VoxelType::AIR && type != VoxelType::AIR) {
+        mySub.solidBlockCount++;
+    } */
+
     mySub.setVoxel(localX, localY, localZ, type);
     
     if (!mySub.meshDirty) {

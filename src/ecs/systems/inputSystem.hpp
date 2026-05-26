@@ -15,9 +15,11 @@ class InputSystem {
         bool cursorLocked = true; // TODO : Verifier que c'est vraiment utile
         bool f11PressedLastFrame = false;
 
-        std::unordered_map<int, bool> m_previousState;
+        std::unordered_map<int, bool> m_previousKeyState;
+        std::unordered_map<int, bool> m_previousMouseState;
         
         bool keyPressedOnce(GLFWwindow* _window, int _key);
+        bool mousePressedOnce(GLFWwindow* _window, int _button);
 
     public:
         InputSystem(GLFWwindow* _window);

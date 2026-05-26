@@ -9,8 +9,15 @@ InputSystem::InputSystem(GLFWwindow* _window){
 
 bool InputSystem::keyPressedOnce(GLFWwindow* _window, int _key) {
     bool isPressed = (glfwGetKey(_window, _key) == GLFW_PRESS);
-    bool triggered = isPressed && !m_previousState[_key];
-    m_previousState[_key] = isPressed;
+    bool triggered = isPressed && !m_previousKeyState[_key];
+    m_previousKeyState[_key] = isPressed;
+    return triggered;
+}
+
+bool InputSystem::mousePressedOnce(GLFWwindow* _window, int _button) {
+    bool isPressed = (glfwGetMouseButton(_window, _button) == GLFW_PRESS);
+    bool triggered = isPressed && !m_previousMouseState[_button];
+    m_previousMouseState[_button] = isPressed;
     return triggered;
 }
 
@@ -33,11 +40,13 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
     lastX = mouseX;
     lastY = mouseY;
 
-    bool toggleFullscreen  = keyPressedOnce(_window, GLFW_KEY_F11);
-    bool toggleWireframe  = keyPressedOnce(_window, GLFW_KEY_F5);
+    bool leftClick = mousePressedOnce(_window, GLFW_MOUSE_BUTTON_LEFT);
+
+    bool toggleFullscreen = keyPressedOnce(_window, GLFW_KEY_F11);
+    bool toggleWireframe = keyPressedOnce(_window, GLFW_KEY_F5);
     bool togglePbr = keyPressedOnce(_window, GLFW_KEY_F10);
     bool toggleTBN = keyPressedOnce(_window, GLFW_KEY_F9);
-    bool toggleNormalMap  = keyPressedOnce(_window, GLFW_KEY_F8);
+    bool toggleNormalMap = keyPressedOnce(_window, GLFW_KEY_F8);
     bool toggleDiffuse = keyPressedOnce(_window, GLFW_KEY_F7);
     bool toggleAmbient = keyPressedOnce(_window, GLFW_KEY_F6);
 
@@ -55,6 +64,8 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         input.moveRight = (glfwGetKey(_window, GLFW_KEY_D) == GLFW_PRESS);
         input.jump = (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS);
         input.sprint = (glfwGetKey(_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
+
+        input.leftClick = leftClick;
 
         input.toggleFullscreen = toggleFullscreen;
         input.toggleWireframe = toggleWireframe;

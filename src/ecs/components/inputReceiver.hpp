@@ -27,6 +27,8 @@ struct InputReceiverComponent : public Component {
     double mouseX = 0.;
     double mouseY = 0.;
     
+    bool leftClick = false;
+    
     InputReceiverComponent() = default;
 };
 

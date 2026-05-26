@@ -55,6 +55,7 @@ using namespace glm;
 #include "ecs/systems/physicsSystem.hpp"
 #include "ecs/systems/collisionSystem.hpp"
 #include "ecs/systems/deltaTimeSystem.hpp"
+#include "ecs/systems/playerInteractionSystem.hpp"
 
 //void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -266,7 +267,8 @@ int main(int argc, char** argv) {
     PlayerMovementSystem movementSystem;
     PhysicsSystem physicsSystem;
     CollisionSystem collisionSystem;
-    
+    PlayerInteractionSystem interactionSystem;
+
     // Systèmes du dev bonus
     TerrainConfig config = LoadConfig("config.txt");
     TerrainSystem terrainSystem(config);
@@ -296,6 +298,7 @@ int main(int argc, char** argv) {
         glm::vec3(.6f, 1.8f, .6f),
         glm::vec3(0.f, .9f, 0.f)
     });
+    registry.addComponent(camEntity, PlayerComponent{});
 
     cameraSystem.initCamera(registry, camEntity, 90, 0, glm::vec3(0,1.8,0));
     
@@ -395,6 +398,7 @@ int main(int argc, char** argv) {
                 movementSystem.update(registry, deltaTime);
                 physicsSystem.update(registry, deltaTime);
                 collisionSystem.update(registry, deltaTime);
+                interactionSystem.update(registry, terrainSystem);
 
                 pathFindingSystem.update(registry);
 
@@ -429,6 +433,7 @@ int main(int argc, char** argv) {
             movementSystem.update(registry, deltaTime);
             physicsSystem.update(registry, deltaTime);
             collisionSystem.update(registry, deltaTime);
+            interactionSystem.update(registry, terrainSystem);
             cameraSystem.update(registry, deltaTime);
             
             pathFindingSystem.update(registry);
