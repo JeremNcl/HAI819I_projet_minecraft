@@ -51,7 +51,7 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
     bool toggleDiffuse = keyPressedOnce(_window, GLFW_KEY_F7);
     bool toggleAmbient = keyPressedOnce(_window, GLFW_KEY_F6);
 
-    bool toggleCameraSwap = keyPressedOnce(_window, GLFW_KEY_F4);
+    bool toggleCameraSwap = keyPressedOnce(_window, GLFW_KEY_F2);
 
     bool f11Pressed = (glfwGetKey(_window, GLFW_KEY_F11) == GLFW_PRESS);
 
