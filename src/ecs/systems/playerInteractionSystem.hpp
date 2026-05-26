@@ -24,8 +24,7 @@ struct RaycastResult {
 class PlayerInteractionSystem {
 private:
     RaycastResult raycast(Registry& _registry, TerrainSystem& _terrain, const glm::vec3& _start, const glm::vec3& _direction, float _reach) const;
-    void breakVoxel(Registry& _registry, TerrainSystem& _terrain, const glm::ivec3& _globalPos);
-
+    
 public:
     void update(Registry& _registry, TerrainSystem& _terrain);
 };

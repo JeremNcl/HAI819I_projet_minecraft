@@ -75,33 +75,6 @@ RaycastResult PlayerInteractionSystem::raycast(Registry& _registry, TerrainSyste
     return result;
 }
 
-void PlayerInteractionSystem::breakVoxel(Registry& _registry, TerrainSystem& _terrain, const glm::ivec3& _globalPos) {
-    int chunkX = std::floor(static_cast<float>(_globalPos.x) / 16.0f);
-    int chunkY = std::floor(static_cast<float>(_globalPos.y) / 16.0f);
-    int chunkZ = std::floor(static_cast<float>(_globalPos.z) / 16.0f);
-
-    EntityID chunkEntity = _terrain.getSubChunkAt(chunkX, chunkY, chunkZ, _registry);
-    
-    if (chunkEntity != 0) {
-        auto& chunk = _registry.getComponent<SubChunkComponent>(chunkEntity);
-        
-        int localX = (_globalPos.x % 16 + 16) % 16;
-        int localY = (_globalPos.y % 16 + 16) % 16;
-        int localZ = (_globalPos.z % 16 + 16) % 16;
-
-        chunk.setVoxel(localX, localY, localZ, VoxelType::AIR);
-        chunk.meshDirty = true;
-        chunk.solidBlockCount--;
-
-        if (localX == 0)  { EntityID n = _terrain.getSubChunkAt(chunkX - 1, chunkY, chunkZ, _registry); if(n) _registry.getComponent<SubChunkComponent>(n).meshDirty = true; }
-        if (localX == 15) { EntityID n = _terrain.getSubChunkAt(chunkX + 1, chunkY, chunkZ, _registry); if(n) _registry.getComponent<SubChunkComponent>(n).meshDirty = true; }
-        if (localY == 0)  { EntityID n = _terrain.getSubChunkAt(chunkX, chunkY - 1, chunkZ, _registry); if(n) _registry.getComponent<SubChunkComponent>(n).meshDirty = true; }
-        if (localY == 15) { EntityID n = _terrain.getSubChunkAt(chunkX, chunkY + 1, chunkZ, _registry); if(n) _registry.getComponent<SubChunkComponent>(n).meshDirty = true; }
-        if (localZ == 0)  { EntityID n = _terrain.getSubChunkAt(chunkX, chunkY, chunkZ - 1, _registry); if(n) _registry.getComponent<SubChunkComponent>(n).meshDirty = true; }
-        if (localZ == 15) { EntityID n = _terrain.getSubChunkAt(chunkX, chunkY, chunkZ + 1, _registry); if(n) _registry.getComponent<SubChunkComponent>(n).meshDirty = true; }
-    }
-}
-
 void PlayerInteractionSystem::update(Registry& _registry, TerrainSystem& _terrain) {
     auto view = _registry.view<PlayerComponent, TransformComponent, InputReceiverComponent>();
 
@@ -113,15 +86,26 @@ void PlayerInteractionSystem::update(Registry& _registry, TerrainSystem& _terrai
             auto& transform = _registry.getComponent<TransformComponent>(entity);
             auto& input = _registry.getComponent<InputReceiverComponent>(entity);
 
-            if (camera.isActive && input.leftClick && player.canBreakBlocks) {
-                
-                RaycastResult result = raycast(_registry, _terrain, transform.position + camera.offset, camera.front, player.reach);
+            if (camera.isActive) {
+                if (input.leftClick && player.canBreakBlocks) {
+                    RaycastResult result = raycast(_registry, _terrain, transform.position + camera.offset, camera.front, player.reach);
 
-                if (result.hit) {
-                    _terrain.setBlock(_registry, result.hitVoxelPos.x, result.hitVoxelPos.y, result.hitVoxelPos.z, VoxelType::AIR);
+                    if (result.hit) {
+                        _terrain.setBlock(_registry, result.hitVoxelPos.x, result.hitVoxelPos.y, result.hitVoxelPos.z, VoxelType::AIR);
+                    }  
+
+                    input.leftClick = false;
                 }
+                if (input.rightClick) {
+                    RaycastResult result = raycast(_registry, _terrain, transform.position + camera.offset, camera.front, player.reach);
+                    if (result.hit) {
+                        glm::ivec3 placePos = result.hitVoxelPos + result.normal;
 
-                input.leftClick = false; 
+                        _terrain.setBlock(_registry, placePos.x, placePos.y, placePos.z, player.currentBloc);
+                    }
+
+                    input.rightClick = false;
+                }
             }
         }
     }

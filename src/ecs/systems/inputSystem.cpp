@@ -41,6 +41,7 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
     lastY = mouseY;
 
     bool leftClick = mousePressedOnce(_window, GLFW_MOUSE_BUTTON_LEFT);
+    bool rightClick = mousePressedOnce(_window, GLFW_MOUSE_BUTTON_RIGHT);
 
     bool toggleFullscreen = keyPressedOnce(_window, GLFW_KEY_F11);
     bool toggleWireframe = keyPressedOnce(_window, GLFW_KEY_F5);
@@ -66,6 +67,7 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         input.sprint = (glfwGetKey(_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
 
         input.leftClick = leftClick;
+        input.rightClick = rightClick;
 
         input.toggleFullscreen = toggleFullscreen;
         input.toggleWireframe = toggleWireframe;
