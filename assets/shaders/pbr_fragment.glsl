@@ -6,6 +6,7 @@ in VS_OUT {
     vec3 TexCoords;
     vec3 Normal;
     vec3 BiomeColor;
+    float AO;
     mat3 TBN;
 } fs_in;
 
@@ -23,9 +24,17 @@ uniform vec3 lightPos;
 uniform vec3 lightColor;
 uniform vec3 viewPos;
 uniform float ambientStrength;
+uniform vec3 ambientSkyColor;
+uniform vec3 ambientGroundColor;
+uniform bool useHemisphericalAmbient;
+uniform bool useBakedAO;
+uniform float aoStrength; // 0.0 = no AO effect, 1.0 = full baked AO influence in mix
 uniform bool debugTBN;
 uniform bool useNormalMap;
 uniform bool debugDiffuseOnly;
+uniform float exposure; // Dynamic exposure for tone mapping
+
+const float HEMISPHERE_BLEND = 0.35;
 
 // === PBR CONSTANTS ===
 const float PI = 3.14159265359;
@@ -163,13 +172,31 @@ void main() {
         return;
     }
     
-    // Ambient lighting (simple)
+    // Ambient lighting
     vec3 ambient = vec3(ambientStrength) * albedo;
+    if (useHemisphericalAmbient) {
+        vec3 up = vec3(0.0, 1.0, 0.0);
+        float ndotUp = clamp(dot(N, up), -1.0, 1.0);
+        float hemiT = ndotUp * 0.5 + 0.5; // remap [-1,1] -> [0,1]
+        vec3 hemiColor = mix(ambientGroundColor, ambientSkyColor, hemiT);
+        vec3 hemiAmbient = hemiColor * ambientStrength * albedo;
+        ambient = mix(ambient, hemiAmbient, HEMISPHERE_BLEND);
+    }
     
-    vec3 color = ambient + Lo;
+    // Apply baked AO only to ambient lighting (contact shadows), not to direct lighting Lo.
+    float aoFactor = 1.0;
+    if (useBakedAO) {
+        aoFactor = mix(1.0, fs_in.AO, aoStrength);
+    }
+
+    vec3 ambientWithAO = ambient * aoFactor;
+    vec3 color = ambientWithAO + Lo;
     
     // Ajout de l'émission (pour les blocs lumineux)
     color += albedo * emission * 5.0;
+    
+    // Apply dynamic exposure before tone mapping
+    color *= exposure;
     
     // Tone mapping (Reinhard)
     color = color / (color + vec3(1.0));

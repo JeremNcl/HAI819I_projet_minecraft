@@ -142,7 +142,11 @@ void BlockTextureManager::bindArrays(GLuint shaderProgram) {
 
     GLint normalStrengthsLoc = glGetUniformLocation(shaderProgram, "normalStrengths");
     if (normalStrengthsLoc >= 0) {
-        glUniform1fv(normalStrengthsLoc, static_cast<GLsizei>(normalStrengths.size()), normalStrengths.data());
+        // Apply a small global reduction to normal map influence for overall softer normals
+        constexpr float kNormalGlobalFactor = 0.85f; // 85% of original
+        std::array<float, 5> scaled = normalStrengths;
+        for (size_t i = 0; i < scaled.size(); ++i) scaled[i] *= kNormalGlobalFactor;
+        glUniform1fv(normalStrengthsLoc, static_cast<GLsizei>(scaled.size()), scaled.data());
     }
     
     // Rétablir l'unité active par défaut
