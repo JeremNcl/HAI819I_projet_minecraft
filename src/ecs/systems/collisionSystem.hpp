@@ -28,6 +28,7 @@ class CollisionSystem {
 
     private:
         bool checkAABBCollision(Registry& _registry, const glm::vec3& _pos, const ColliderComponent& _collider) const;
+        void resolveAxisCollision(Registry& _registry, glm::vec3& _pos, float& _axisVelocity, const ColliderComponent& _collider, int _axisIndex) const;
         VoxelType getVoxelAt(int x, int y, int z) const;
         bool isVoxelSolid(VoxelType type) const;
 };

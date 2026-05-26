@@ -29,22 +29,21 @@ bool CollisionSystem::isVoxelSolid(VoxelType type) const {
 bool CollisionSystem::checkAABBCollision(Registry& _registry, const glm::vec3& _pos,
     const ColliderComponent& _collider) const {
 
-    glm::vec3 minBox = _pos + _collider.offset - (_collider.size * .5f);
-    glm::vec3 maxBox = _pos + _collider.offset + (_collider.size * .5f);
+    AABB box = _collider.getAABB(_pos);
 
-    minBox += EPSILON_COLLISION;
-    maxBox -= EPSILON_COLLISION;
+    box.min += EPSILON_COLLISION;
+    box.max -= EPSILON_COLLISION;
 
     // BROAD PHASE :
     // On utilise la grille spatial à la place d'un tree
     // C'est une solution spécifique à notre voxel engine qui permet de
     // ce passer d'un arbre car tout est un voxel que l'on peut directement isoler.
-    int minX = std::floor(minBox.x);
-    int maxX = std::floor(maxBox.x);
-    int minY = std::floor(minBox.y);
-    int maxY = std::floor(maxBox.y);
-    int minZ = std::floor(minBox.z);
-    int maxZ = std::floor(maxBox.z);
+    int minX = std::floor(box.min.x);
+    int maxX = std::floor(box.max.x);
+    int minY = std::floor(box.min.y);
+    int maxY = std::floor(box.max.y);
+    int minZ = std::floor(box.min.z);
+    int maxZ = std::floor(box.max.z);
 
     // NARROW PHASE :
     // Vérification de contact réel. Même principe, tout étant en AABB,
@@ -59,6 +58,21 @@ bool CollisionSystem::checkAABBCollision(Registry& _registry, const glm::vec3& _
         }
     }
     return false;
+}
+
+void CollisionSystem::resolveAxisCollision(Registry& _registry, glm::vec3& _pos, float& _axisVelocity, const ColliderComponent& _collider, int _axisIndex) const {
+    if (_axisVelocity == 0.0f) return;
+
+    if (checkAABBCollision(_registry, _pos, _collider)) {
+        AABB box = _collider.getAABB(_pos);
+        
+        if (_axisVelocity > 0.0f) {
+            _pos[_axisIndex] = std::floor(box.max[_axisIndex]) - (_collider.offset[_axisIndex] + _collider.size[_axisIndex] * 0.5f) - EPSILON_POSITION;
+        } else {
+            _pos[_axisIndex] = std::floor(box.min[_axisIndex]) + 1.0f - (_collider.offset[_axisIndex] - _collider.size[_axisIndex] * 0.5f) + EPSILON_POSITION;
+        }
+        _axisVelocity = 0.0f;
+    }
 }
 
 void CollisionSystem::update(Registry& _registry, float _deltaTime) {
@@ -84,42 +98,15 @@ void CollisionSystem::update(Registry& _registry, float _deltaTime) {
 
         // AXE Y
         pos.y += velocity.velocity.y * _deltaTime;
-        if (checkAABBCollision(_registry, pos, collider)) {
-            if (velocity.velocity.y > 0.0f) {
-                float maxY = pos.y + collider.offset.y + collider.size.y * 0.5f;
-                pos.y = std::floor(maxY) - (collider.offset.y + collider.size.y * 0.5f) - EPSILON_POSITION;
-            } else if (velocity.velocity.y < 0.0f) {
-                float minY = pos.y + collider.offset.y - collider.size.y * 0.5f;
-                pos.y = std::floor(minY) + 1.0f - (collider.offset.y - collider.size.y * 0.5f) + EPSILON_POSITION;
-            }
-            velocity.velocity.y = 0.0f;
-        }
+        resolveAxisCollision(_registry, pos, velocity.velocity.y, collider, 1);
 
         // AXE X
         pos.x += velocity.velocity.x * _deltaTime;
-        if (checkAABBCollision(_registry, pos, collider)) {
-            if (velocity.velocity.x > 0.0f) {
-                float maxX = pos.x + collider.offset.x + collider.size.x * 0.5f;
-                pos.x = std::floor(maxX) - (collider.offset.x + collider.size.x * 0.5f) - EPSILON_POSITION;
-            } else if (velocity.velocity.x < 0.0f) {
-                float minX = pos.x + collider.offset.x - collider.size.x * 0.5f;
-                pos.x = std::floor(minX) + 1.0f - (collider.offset.x - collider.size.x * 0.5f) + EPSILON_POSITION;
-            }
-            velocity.velocity.x = 0.0f;
-        }
+        resolveAxisCollision(_registry, pos, velocity.velocity.x, collider, 0);
 
         // AXE Z
         pos.z += velocity.velocity.z * _deltaTime;
-        if (checkAABBCollision(_registry, pos, collider)) {
-            if (velocity.velocity.z > 0.0f) {
-                float maxZ = pos.z + collider.offset.z + collider.size.z * 0.5f;
-                pos.z = std::floor(maxZ) - (collider.offset.z + collider.size.z * 0.5f) - EPSILON_POSITION;
-            } else if (velocity.velocity.z < 0.0f) {
-                float minZ = pos.z + collider.offset.z - collider.size.z * 0.5f;
-                pos.z = std::floor(minZ) + 1.0f - (collider.offset.z - collider.size.z * 0.5f) + EPSILON_POSITION;
-            }
-            velocity.velocity.z = 0.0f;
-        }
+        resolveAxisCollision(_registry, pos, velocity.velocity.z, collider, 2);
 
         transform.position = pos;
 

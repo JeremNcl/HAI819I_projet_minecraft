@@ -45,10 +45,66 @@ void ChunkWorker::processTasks() {
             continue;
         }
 
-        std::array<glm::vec3, TerrainGenerator::CHUNK_WIDTH * TerrainGenerator::CHUNK_DEPTH> biomeColors;
-        std::array<std::vector<BlockType>,16> data = m_generator.GenerateChunk(task.first, task.second, &biomeColors);
-        
-        std::lock_guard<std::mutex> lock(resultsMutex);
-        results.push_back({task.first, task.second, std::move(data), std::move(biomeColors), true});
+        ChunkTask resultTask;
+        resultTask.x = task.first;
+        resultTask.z = task.second;
+
+        bool loadedFromDisk = ChunkSerializer::LoadChunk(task.first, task.second, resultTask.chunkData);
+
+        if (!loadedFromDisk) {
+            std::array<glm::vec3, TerrainGenerator::CHUNK_WIDTH * TerrainGenerator::CHUNK_DEPTH> rawBiomeColors;
+            
+            auto generatedData = m_generator.GenerateChunk(task.first, task.second, &rawBiomeColors);
+            
+            resultTask.chunkData.x = task.first;
+            resultTask.chunkData.z = task.second;
+            resultTask.chunkData.biomeColors = rawBiomeColors;
+            resultTask.chunkData.subChunkMask = 0;
+
+            for (int subY = 0; subY < 16; ++subY) {
+                resultTask.chunkData.subChunksVoxels[subY].resize(4096, 0);
+                bool subChunkHasBlocks = false;
+
+                for (int i = 0; i < 4096; ++i) {
+                    BlockType genBlock = generatedData[subY][i];
+                    VoxelType t = VoxelType::AIR;
+                    
+                    switch(genBlock) {
+                        case BlockType::STONE:   t = VoxelType::STONE; break;
+                        case BlockType::DIRT:    t = VoxelType::DIRT; break;
+                        case BlockType::GRASS:   t = VoxelType::GRASS; break;
+                        case BlockType::WOOD:    t = VoxelType::WOOD; break;
+                        case BlockType::LEAVES:  t = VoxelType::LEAVES; break;
+                        case BlockType::BEDROCK: t = VoxelType::BEDROCK; break;
+                        case BlockType::COAL:    t = VoxelType::COAL; break;
+                        case BlockType::IRON:    t = VoxelType::IRON; break;
+                        case BlockType::GOLD:    t = VoxelType::GOLD; break;
+                        case BlockType::DIAMOND: t = VoxelType::DIAMOND; break;
+                        case BlockType::LAVA:    t = VoxelType::LAVA; break;
+                        case BlockType::SAND:    t = VoxelType::SAND; break;
+                        case BlockType::WATER:   t = VoxelType::WATER; break;
+                        default:                 t = VoxelType::AIR; break;
+                    }
+
+                    resultTask.chunkData.subChunksVoxels[subY][i] = static_cast<uint8_t>(t);
+                    if (t != VoxelType::AIR) {
+                        subChunkHasBlocks = true;
+                    }
+                }
+
+                if (subChunkHasBlocks) {
+                    resultTask.chunkData.subChunkMask |= (1 << subY);
+                } else {
+                    resultTask.chunkData.subChunksVoxels[subY].clear();
+                }
+            }
+        }
+
+        resultTask.ready = true;
+
+        {
+            std::lock_guard<std::mutex> lock(resultsMutex);
+            results.push_back(std::move(resultTask));
+        }
     }
 }
