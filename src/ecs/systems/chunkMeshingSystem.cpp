@@ -218,14 +218,6 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
     }
 }
 
-/* void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
-                                      SubChunkComponent& voxelData,
-                                      MeshComponent& mesh,
-                                      const WorldMapComponent& worldMap) {
-    std::vector<Vertex> vertices;
-    std::vector<GLuint> indices;
-} */
-
 bool ChunkMeshingSystem::isMeshingComplete(Registry& registry) const {
     auto view = registry.view<SubChunkComponent>();
     
@@ -352,7 +344,9 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
                             VoxelType neighbor = getVoxelGlobal(voxelData, nx, ny, nz, cache);
                             
                             bool isLeaves = (current == VoxelType::LEAVES);
-                            if (neighbor == VoxelType::AIR || (current == VoxelType::LEAVES)) {
+                            bool isWood = (current == VoxelType::WOOD);
+                            
+                            if (neighbor == VoxelType::AIR || isLeaves || isWood) {
                                 mask[maskIndex] = current;
                                 // Build signature from precomputed corner AO values
                                 int iCell = x[u];
