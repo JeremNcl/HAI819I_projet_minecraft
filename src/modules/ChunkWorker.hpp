@@ -7,12 +7,13 @@
 #include <glm/glm.hpp>
 #include "terrain_gen/TerrainGenerator.hpp"
 #include <array>
+#include "ChunkSerializer.hpp"
 
 struct ChunkTask {
-    int x, z;
-    std::array<std::vector<BlockType>, 16> data;
-    std::array<glm::vec3, TerrainGenerator::CHUNK_WIDTH * TerrainGenerator::CHUNK_DEPTH> biomeColors;
+    int x;
+    int z;
     bool ready = false;
+    ChunkDataDTO chunkData;
 };
 
 class ChunkWorker {
