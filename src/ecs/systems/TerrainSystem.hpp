@@ -6,6 +6,7 @@
 #include "ecs/components/mesh.hpp"
 #include "ecs/components/camera.hpp"
 #include "modules/ChunkWorker.hpp"
+#include "modules/ChunkSerializer.hpp"
 #include <map>
 #include <utility>
 #include <cmath>
@@ -27,6 +28,37 @@ private:
     void destroyChunkRecursive(Registry& registry, EntityID parentEntity) {
         if (registry.hasComponent<ChunkComponent>(parentEntity)) {
             auto& chunkComp = registry.getComponent<ChunkComponent>(parentEntity);
+            
+            if (chunkComp.isModified) {
+                ChunkDataDTO dto;
+                dto.x = chunkComp.chunkPosition.x;
+                dto.z = chunkComp.chunkPosition.y;
+                dto.subChunkMask = 0;
+
+                bool biomesCopied = false;
+
+                for (int subY = 0; subY < 16; ++subY) {
+                    EntityID subChunkID = chunkComp.subChunks[subY];
+                    if (subChunkID != 0 && registry.hasComponent<SubChunkComponent>(subChunkID)) {
+                        auto& subChunk = registry.getComponent<SubChunkComponent>(subChunkID);
+                        
+                        if (!biomesCopied) {
+                            dto.biomeColors = subChunk.biomeColors;
+                            biomesCopied = true;
+                        }
+
+                        if (subChunk.solidBlockCount > 0) {
+                            dto.subChunkMask |= (1 << subY);
+                            dto.subChunksVoxels[subY] = subChunk.voxels;
+                        }
+                    }
+                }
+                
+                if (biomesCopied) {
+                    ChunkSerializer::SaveChunk(dto);
+                }
+            }
+            
             for (EntityID subChunkID : chunkComp.subChunks) {
                 if (subChunkID != 0) {
                     
@@ -119,58 +151,36 @@ public:
             if (activeChunks.find(coords) != activeChunks.end()) {
                 EntityID parentEntity = activeChunks[coords];
                 ChunkComponent chunkManager(glm::ivec2(result.x, result.z));
-                
+                chunkManager.isModified = false;
+
                 for (int subY = 0; subY < 16; ++subY){
                     EntityID subChunkEntity = registry.createEntity();
                     SubChunkComponent subChunk(glm::ivec3(result.x, subY, result.z));
-                    subChunk.biomeColors = result.biomeColors;
-                    int solidCount = 0;
-
-                    for (int y = 0; y < 16; ++y) {
-                        for (int z = 0; z < 16; ++z) {
-                            for (int x = 0; x < 16; ++x) {
-                                int localIdx = x + (z * 16) + (y * 16 * 16); 
-                                BlockType genBlock = result.data[subY][localIdx];
-
-                                VoxelType t = VoxelType::AIR;
-                                
-                                switch(genBlock) {
-                                    case BlockType::STONE:   t = VoxelType::STONE; break;
-                                    case BlockType::DIRT:    t = VoxelType::DIRT; break;
-                                    case BlockType::GRASS:   t = VoxelType::GRASS; break;
-                                    case BlockType::WOOD:    t = VoxelType::WOOD; break;
-                                    case BlockType::LEAVES:  t = VoxelType::LEAVES; break;
-                                    case BlockType::BEDROCK: t = VoxelType::BEDROCK; break;
-                                    case BlockType::COAL:    t = VoxelType::COAL; break;
-                                    case BlockType::IRON:    t = VoxelType::IRON; break;
-                                    case BlockType::GOLD:    t = VoxelType::GOLD; break;
-                                    case BlockType::DIAMOND: t = VoxelType::DIAMOND; break;
-                                    case BlockType::LAVA:    t = VoxelType::LAVA; break;
-                                    case BlockType::SAND:    t = VoxelType::SAND; break;
-                                    case BlockType::WATER:   t = VoxelType::WATER; break;
-                                    default:                 t = VoxelType::AIR; break;
-                                }
-                                
-                                if (t != VoxelType::AIR) {
-                                    subChunk.setVoxel(x, y, z, t);
-                                    solidCount++;
-                                }
-                            }
+                    subChunk.biomeColors = result.chunkData.biomeColors;
+                    
+                    if (result.chunkData.subChunkMask & (1 << subY)) {
+                        subChunk.voxels = std::move(result.chunkData.subChunksVoxels[subY]);
+                        
+                        int solidCount = 0;
+                        for (uint8_t v : subChunk.voxels) {
+                            if (static_cast<VoxelType>(v) != VoxelType::AIR) solidCount++;
                         }
+                        subChunk.solidBlockCount = solidCount;
+                        subChunk.meshDirty = (solidCount > 0);
+                    } else {
+                        subChunk.voxels.assign(4096, 0);
+                        subChunk.solidBlockCount = 0;
+                        subChunk.meshDirty = false;
                     }
                     
-                    subChunk.meshDirty = true;
                     registry.addComponent(subChunkEntity, subChunk);
                     registry.addComponent(subChunkEntity, MeshComponent());
                     registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f,0.0f,0.0f)));
                     
                     chunkManager.subChunks[subY] = subChunkEntity;
                     
-                    if (solidCount > 0) {
-                        registry.getComponent<SubChunkComponent>(subChunkEntity).meshDirty = true;
+                    if (subChunk.solidBlockCount > 0) {
                         requestMesh(subChunkEntity);
-                    } else {
-                        registry.getComponent<SubChunkComponent>(subChunkEntity).meshDirty = false;
                     }
                 }
 
@@ -178,29 +188,11 @@ public:
                 registry.addComponent(parentEntity, chunkManager);
 
                 std::pair<int, int> neighbors[4] = {
-                    {result.x + 1, result.z}, {result.x - 1, result.z},
-                    {result.x, result.z + 1}, {result.x, result.z - 1}
+                    {result.chunkData.x + 1, result.chunkData.z}, {result.chunkData.x - 1, result.chunkData.z},
+                    {result.chunkData.x, result.chunkData.z + 1}, {result.chunkData.x, result.chunkData.z - 1}
                 };
-                /* for (const auto& n : neighbors) {
-                    if (activeChunks.find(n) != activeChunks.end()) {
-                        EntityID neighborParent = activeChunks[n];
-                        if (neighborParent != 0 && registry.hasComponent<ChunkComponent>(neighborParent)) {
-                            auto& neighborChunk = registry.getComponent<ChunkComponent>(neighborParent);
-                            for (EntityID subID : neighborChunk.subChunks) {
-                                if (subID != 0 && registry.hasComponent<SubChunkComponent>(subID)) {
-                                    
-                                    auto& neighborSub = registry.getComponent<SubChunkComponent>(subID);
-                                    
-                                    if (neighborSub.solidBlockCount > 0 && !neighborSub.meshDirty) {
-                                        neighborSub.meshDirty = true;
-                                        requestMesh(subID);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } */
-               for (const auto& n : neighbors) {
+                
+                for (const auto& n : neighbors) {
                     if (activeChunks.find(n) != activeChunks.end()) {
                         EntityID neighborParent = activeChunks[n];
                         if (neighborParent != 0 && registry.hasComponent<ChunkComponent>(neighborParent)) {
@@ -258,14 +250,20 @@ public:
         auto& mySub = registry.getComponent<SubChunkComponent>(mySubID);
 
         VoxelType oldType = mySub.getVoxel(localX, localY, localZ);
-        if (oldType != VoxelType::AIR && type == VoxelType::AIR) {
-            mySub.solidBlockCount--;
-        } else if (oldType == VoxelType::AIR && type != VoxelType::AIR) {
-            mySub.solidBlockCount++;
-        }
+    
+        if (oldType == type) return;
 
         mySub.setVoxel(localX, localY, localZ, type);
         
+        auto itChunk = activeChunks.find({chunkX, chunkZ});
+        if (itChunk != activeChunks.end()) {
+            EntityID parentEntity = itChunk->second;
+            if (parentEntity != 0 && registry.hasComponent<ChunkComponent>(parentEntity)) {
+                auto& chunkComp = registry.getComponent<ChunkComponent>(parentEntity);
+                chunkComp.isModified = true;
+            }
+        }
+
         if (!mySub.meshDirty) {
             mySub.meshDirty = true;
             requestMesh(mySubID);

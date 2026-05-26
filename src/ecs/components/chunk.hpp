@@ -113,6 +113,8 @@ struct SubChunkComponent : public Component {
 struct ChunkComponent : public Component {
     glm::ivec2 chunkPosition = glm::ivec2(0); 
     
+    bool isModified = false;
+
     std::array<EntityID, 16> subChunks = {0}; 
     
     bool isFullyGenerated = false;

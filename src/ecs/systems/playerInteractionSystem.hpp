@@ -9,6 +9,7 @@
 #include "ecs/components/transform.hpp"
 #include "ecs/components/chunk.hpp"
 #include "ecs/components/player.hpp"
+#include "ecs/components/collider.hpp"
 
 #include <glm/glm.hpp>
 #include <limits>
@@ -24,7 +25,7 @@ struct RaycastResult {
 class PlayerInteractionSystem {
 private:
     RaycastResult raycast(Registry& _registry, TerrainSystem& _terrain, const glm::vec3& _start, const glm::vec3& _direction, float _reach) const;
-    
+    bool checkAABBIntersection(const AABB& _a, const AABB& _b);
 public:
     void update(Registry& _registry, TerrainSystem& _terrain);
 };

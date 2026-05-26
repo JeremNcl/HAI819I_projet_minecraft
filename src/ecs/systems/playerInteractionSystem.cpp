@@ -1,5 +1,11 @@
 #include "playerInteractionSystem.hpp"
 
+bool PlayerInteractionSystem::checkAABBIntersection(const AABB& a, const AABB& b) {
+    return (a.min.x < b.max.x && a.max.x > b.min.x) &&
+           (a.min.y < b.max.y && a.max.y > b.min.y) &&
+           (a.min.z < b.max.z && a.max.z > b.min.z);
+}
+
 RaycastResult PlayerInteractionSystem::raycast(Registry& _registry, TerrainSystem& _terrain, const glm::vec3& _start, const glm::vec3& _direction, float _reach) const {
     RaycastResult result;
     glm::vec3 direction = glm::normalize(_direction);
@@ -85,6 +91,7 @@ void PlayerInteractionSystem::update(Registry& _registry, TerrainSystem& _terrai
             auto& camera = _registry.getComponent<CameraComponent>(entity);
             auto& transform = _registry.getComponent<TransformComponent>(entity);
             auto& input = _registry.getComponent<InputReceiverComponent>(entity);
+            auto& collider = _registry.getComponent<ColliderComponent>(entity);
 
             if (camera.isActive) {
                 if (input.leftClick && player.canBreakBlocks) {
@@ -101,9 +108,16 @@ void PlayerInteractionSystem::update(Registry& _registry, TerrainSystem& _terrai
                     if (result.hit) {
                         glm::ivec3 placePos = result.hitVoxelPos + result.normal;
 
-                        _terrain.setBlock(_registry, placePos.x, placePos.y, placePos.z, player.currentBloc);
-                    }
+                        AABB playerBox = collider.getAABB(transform.position);
 
+                        AABB blockBox;
+                        blockBox.min = glm::vec3(placePos.x, placePos.y, placePos.z);
+                        blockBox.max = blockBox.min + glm::vec3(1.0f);
+
+                        if (!checkAABBIntersection(playerBox, blockBox)) {
+                            _terrain.setBlock(_registry, placePos.x, placePos.y, placePos.z, player.currentBloc);
+                        }
+                    }
                     input.rightClick = false;
                 }
             }
