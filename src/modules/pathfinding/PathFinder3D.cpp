@@ -2,12 +2,11 @@
 #include <algorithm>
 #include <iostream>
 
-int PathFinder3D::GetDistance(glm::ivec3 a, glm::ivec3 b) const {
-    return std::abs(a.x - b.x) + std::abs(a.y - b.y) + std::abs(a.z - b.z);
+float PathFinder3D::GetDistance(glm::ivec3 a, glm::ivec3 b) const {
+    return glm::distance(glm::vec3(a), glm::vec3(b));
 }
 
 std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 targetPos, Registry& registry) {
-    
     SubChunkCache subChunkCache;
     auto view = registry.view<SubChunkComponent, MeshComponent>();
     for (EntityID entity : view) {
@@ -16,13 +15,13 @@ std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 t
     }
 
     std::priority_queue<PathNode, std::vector<PathNode>, std::greater<PathNode>> openSet;
-    std::unordered_map<glm::ivec3, int, GLMVec3Hash> gCostMap;
+    std::unordered_map<glm::ivec3, float, GLMVec3Hash> gCostMap;
     std::unordered_map<glm::ivec3, glm::ivec3, GLMVec3Hash> parentMap;
 
-    openSet.push({startPos, 0, GetDistance(startPos, targetPos), startPos});
-    gCostMap[startPos] = 0;
+    openSet.push({startPos, 0.0f, GetDistance(startPos, targetPos), startPos});
+    gCostMap[startPos] = 0.0f;
 
-    int maxIterations = 5000;
+    int maxIterations = 3000;
     int iterations = 0;
 
     while (!openSet.empty() && iterations < maxIterations) {
@@ -31,25 +30,22 @@ std::vector<glm::ivec3> PathFinder3D::FindPath(glm::ivec3 startPos, glm::ivec3 t
         openSet.pop();
 
         if (currentNode.pos == targetPos) {
-            std::cout << "Chemin trouve en " << iterations << " iterations !\n";
             return RetracePath(parentMap, startPos, targetPos);
         }
 
         if (currentNode.gCost > gCostMap[currentNode.pos]) continue;
 
         for (glm::ivec3 neighborPos : GetValidNeighbors(currentNode.pos, subChunkCache)) {
-            int newMovementCostToNeighbor = currentNode.gCost + 1;
+            float newMovementCostToNeighbor = currentNode.gCost + GetDistance(currentNode.pos, neighborPos);
 
             if (gCostMap.find(neighborPos) == gCostMap.end() || newMovementCostToNeighbor < gCostMap[neighborPos]) {
                 gCostMap[neighborPos] = newMovementCostToNeighbor;
                 parentMap[neighborPos] = currentNode.pos; 
-                int hCost = GetDistance(neighborPos, targetPos);
+                float hCost = GetDistance(neighborPos, targetPos);
                 openSet.push({neighborPos, newMovementCostToNeighbor, hCost, currentNode.pos});
             }
         }
     }
-    
-    std::cout << "Aucun chemin trouve ! (Cible inaccessible)\n";
     return std::vector<glm::ivec3>(); 
 }
 
@@ -66,19 +62,53 @@ std::vector<glm::ivec3> PathFinder3D::RetracePath(std::unordered_map<glm::ivec3,
 
 std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, const SubChunkCache& subChunkCache) {
     std::vector<glm::ivec3> neighbors;
-    glm::ivec3 directions[6] = {
-        glm::ivec3( 1,  0,  0), glm::ivec3(-1,  0,  0),
-        glm::ivec3( 0,  1,  0), glm::ivec3( 0, -1,  0),
-        glm::ivec3( 0,  0,  1), glm::ivec3( 0,  0, -1)
+
+    glm::ivec3 horizontalDirs[8] = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1},
+        {1, 0, 1}, {1, 0, -1}, {-1, 0, 1}, {-1, 0, -1}
     };
 
-    for (int i = 0; i < 6; ++i) {
-        glm::ivec3 neighborPos = currentPos + directions[i];
-        
-        if (!IsBlockSolid(neighborPos, subChunkCache)) {
-            neighbors.push_back(neighborPos);
+    for (int i = 0; i < 8; ++i) {
+        glm::ivec3 dir = horizontalDirs[i];
+
+        if (std::abs(dir.x) == 1 && std::abs(dir.z) == 1) {
+            if (IsBlockSolid(currentPos + glm::ivec3(dir.x, 0, 0), subChunkCache) ||
+                IsBlockSolid(currentPos + glm::ivec3(0, 0, dir.z), subChunkCache)) {
+                continue; 
+            }
+        }
+
+        glm::ivec3 flatTarget = currentPos + dir;
+        if (!IsBlockSolid(flatTarget, subChunkCache) && 
+            !IsBlockSolid(flatTarget + glm::ivec3(0, 1, 0), subChunkCache)) {
+            
+            if (IsBlockSolid(flatTarget + glm::ivec3(0, -1, 0), subChunkCache)) {
+                neighbors.push_back(flatTarget);
+                continue;
+            }
+        }
+
+        glm::ivec3 upTarget = currentPos + dir + glm::ivec3(0, 1, 0);
+        if (IsBlockSolid(currentPos + dir, subChunkCache) &&                                // CORRECTION : Le bloc devant doit être solide pour servir de marche
+            !IsBlockSolid(upTarget, subChunkCache) &&                                       // Pieds de la marche vides
+            !IsBlockSolid(upTarget + glm::ivec3(0, 1, 0), subChunkCache) &&                 // Tête de la marche vide
+            !IsBlockSolid(currentPos + glm::ivec3(0, 2, 0), subChunkCache)) {               // Plafond actuel libre pour sauter
+            
+            neighbors.push_back(upTarget);
+            continue;
+        }
+
+        glm::ivec3 downTarget = currentPos + dir + glm::ivec3(0, -1, 0);
+        if (!IsBlockSolid(currentPos + dir, subChunkCache) &&                               // Le corps ne doit pas heurter un mur devant
+            !IsBlockSolid(currentPos + dir + glm::ivec3(0, 1, 0), subChunkCache) &&         // La tête ne doit pas heurter un mur devant
+            !IsBlockSolid(downTarget, subChunkCache) &&                                     // L'espace de chute (pieds) doit être vide
+            IsBlockSolid(downTarget + glm::ivec3(0, -1, 0), subChunkCache)) {               // CORRECTION : Il doit y avoir un sol solide pour réceptionner le zombie
+            
+            neighbors.push_back(downTarget);
+            continue;
         }
     }
+
     return neighbors;
 }
 
@@ -89,16 +119,13 @@ bool PathFinder3D::IsBlockSolid(glm::ivec3 pos, const SubChunkCache& subChunkCac
     int subY   = pos.y / 16;
 
     auto it = subChunkCache.find(glm::ivec3(chunkX, subY, chunkZ));
-    
     if (it != subChunkCache.end()) {
         const SubChunkComponent* subChunk = it->second;
-        
         int localX = pos.x - (chunkX * 16);
         int localZ = pos.z - (chunkZ * 16);
 
-        VoxelType type = subChunk->getVoxel(localX, pos.y, localZ);
+        VoxelType type = subChunk->getVoxel(localX, pos.y % 16, localZ); // Ajout d'un %16 au cas où localY n'est pas géré en interne
         return type != VoxelType::AIR;
     }
-    
     return true; 
 }

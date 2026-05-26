@@ -46,6 +46,8 @@ bool RenderSystem::isAABBInFrustum(const glm::vec3& min, const glm::vec3& max, c
 
 void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::vec3& lightColor, const glm::vec3& lightDirection) {    
     auto view = registry.view<MeshComponent, TransformComponent, SubChunkComponent>();
+    auto monsterView = registry.view<MonsterComponent, MeshComponent, TransformComponent>();
+    
     Registry::View cameraView = registry.view<CameraComponent>();
 
     if (cameraView.isEmpty()) return;
@@ -183,6 +185,36 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::v
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(node.mesh->indexCount), GL_UNSIGNED_INT, nullptr);
     }
     
+    for (EntityID entity : monsterView) {
+        const auto& mesh = registry.getComponent<MeshComponent>(entity);
+        const auto& transform = registry.getComponent<TransformComponent>(entity);
+
+        if (mesh.indexCount == 0 || mesh.VAO == 0) continue;
+
+        glm::vec3 monsterMin = transform.position - glm::vec3(0.5f, 0.0f, 0.5f);
+        glm::vec3 monsterMax = transform.position + glm::vec3(0.5f, 2.0f, 0.5f);
+
+        if (!isAABBInFrustum(monsterMin, monsterMax, frustumPlanes)) {
+            continue; 
+        }
+
+        glm::mat4 modelMatrix = glm::mat4(1.0f);
+        modelMatrix = glm::translate(modelMatrix, transform.position);
+        
+        // Si TransformComponent gère la rotation sur l'axe Y (lacet) :
+        // modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        glm::mat4 entityMVP = vpMatrix * modelMatrix;
+        glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(modelMatrix)));
+
+        glUniformMatrix4fv(uniforms.mvp, 1, GL_FALSE, glm::value_ptr(entityMVP));
+        glUniformMatrix4fv(uniforms.model, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+        glUniformMatrix3fv(uniforms.normalMatrix, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+
+        glBindVertexArray(mesh.VAO);
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mesh.indexCount), GL_UNSIGNED_INT, nullptr);
+    }
+
     glBindVertexArray(0);
     glUseProgram(0);
 }

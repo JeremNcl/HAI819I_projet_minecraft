@@ -2,11 +2,7 @@
 #include "ecs/registry.hpp"
 #include "ecs/components/transform.hpp"
 #include "modules/pathfinding/PathFinder3D.hpp"
-
-struct AIComponent : public Component {
-    glm::ivec3 target;
-    std::vector<glm::ivec3> currentPath;
-};
+#include "ecs/components/ia.hpp"
 
 class PathFindingSystem {
 private:
@@ -14,10 +10,10 @@ private:
 
 public:
     void update(Registry& registry) {
-        auto view = registry.view<AIComponent, TransformComponent>();
+        auto view = registry.view<IAComponent, TransformComponent>();
 
         for (EntityID entity : view) {
-            auto& ai = registry.getComponent<AIComponent>(entity);
+            auto& ai = registry.getComponent<IAComponent>(entity);
             const auto& transform = registry.getComponent<TransformComponent>(entity);
 
             if (ai.currentPath.empty()) {

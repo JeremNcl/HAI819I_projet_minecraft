@@ -26,10 +26,16 @@ public:
 
     // === GESTION DU CACHE DE MESHES ===
     static void clearMeshCache();
+    
+    // Récupérer ou créer le mesh du zombie en brut
+    static std::shared_ptr<Mesh> getZombieMesh();
 
 private:
     // === CACHE DE MESHES ===
     static std::unordered_map<std::string, std::shared_ptr<Mesh>> meshCache;
+    
+    // Helper pour ajouter une boîte texturée au mesh
+    void addBox(const glm::vec3& center, const glm::vec3& size);
 };
 
 #endif

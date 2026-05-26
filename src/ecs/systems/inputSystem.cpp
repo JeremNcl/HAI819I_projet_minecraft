@@ -45,6 +45,7 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
 
     // Commandes globales de la fenêtre moteur
     bool toggleFullscreen = keyPressedOnce(_window, GLFW_KEY_F11);
+    bool toggleMonsterSpawn = keyPressedOnce(_window, GLFW_KEY_T);
     bool f11Pressed = (glfwGetKey(_window, GLFW_KEY_F11) == GLFW_PRESS);
 
     for (EntityID entity : view) {
@@ -63,6 +64,7 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         input.rightClick = rightClick;
 
         input.toggleFullscreen = toggleFullscreen;
+        input.toggleMonsterSpawn = toggleMonsterSpawn;
 
         input.mouseX = deltaX;
         input.mouseY = deltaY;
