@@ -46,6 +46,7 @@ using namespace glm;
 #include "ecs/components/skyboxComponent.hpp"
 #include "ecs/components/timeComponent.hpp"
 #include "ecs/components/lightingStateComponent.hpp"
+#include "ecs/components/deltaTime.hpp"
 #include "ecs/systems/chunkMeshingSystem.hpp"
 #include "ecs/systems/renderSystem.hpp"
 #include "ecs/systems/inputSystem.hpp"
@@ -58,16 +59,17 @@ using namespace glm;
 #include "ecs/systems/lightingCalculationSystem.hpp"
 #include "ecs/systems/PathFindingSystem.hpp"
 #include "ecs/systems/TerrainSystem.hpp"
+#include "ecs/systems/playerMovementSystem.hpp"
+#include "ecs/systems/physicsSystem.hpp"
+#include "ecs/systems/collisionSystem.hpp"
+#include "ecs/systems/deltaTimeSystem.hpp"
+#include "ecs/systems/playerInteractionSystem.hpp"
 
 //void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void MeshingWorkerThread(Registry& registry, TerrainSystem& terrain, ChunkMeshingSystem& meshing);
 
-// timing
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-
-// Debug flags
+// Debug flags PBR
 bool debugWireframe = false;
 bool usePbrShader = true;
 bool debugTBN = false;
@@ -75,7 +77,7 @@ bool useNormalMap = true;
 bool debugDiffuseOnly = false;
 bool useHemisphericalAmbient = true;
 bool useBakedAO = true;
-float aoStrength = 0.50f; // default blend between 1.0 and baked AO
+float aoStrength = 0.50f;
 bool useReducedAmbient = false;
 
 // Day / Night cycle (managed by DebugInputSystem)
@@ -391,8 +393,18 @@ int main(int argc, char** argv) {
     
     Registry registry;
     
-    
+
+
+    auto deltaTimeView = registry.view<DeltaTimeComponent>();
+    if (deltaTimeView.isEmpty()) {
+        EntityID deltaTimeEntity = registry.createEntity();
+        registry.addComponent(deltaTimeEntity, DeltaTimeComponent());
+        deltaTimeView = registry.view<DeltaTimeComponent>();
+    }
+    DeltaTimeComponent& deltaTimeComponent = registry.getComponent<DeltaTimeComponent>(*deltaTimeView.begin());
+
     // Créer les systèmes
+    DeltaTimeSystem deltaTimeSystem;
     ChunkMeshingSystem meshingSystem;
     RenderSystem renderSystem;
     InputSystem inputSystem(window);
@@ -403,8 +415,12 @@ int main(int argc, char** argv) {
     SkyboxSystem skyboxSystem;
     TimeSystem timeSystem;
     LightingCalculationSystem lightingSystem;
-    
-    // Systèmes du dev bonus
+    PlayerMovementSystem movementSystem;
+    PhysicsSystem physicsSystem;
+    CollisionSystem collisionSystem;
+    PlayerInteractionSystem interactionSystem;
+
+    // Systèmes terrain et pathfinding
     TerrainConfig config = LoadConfig("config.txt");
     TerrainSystem terrainSystem(config);
     PathFindingSystem pathFindingSystem;
@@ -422,14 +438,32 @@ int main(int argc, char** argv) {
 
     EntityID camEntity = registry.createEntity();
     registry.addComponent(camEntity, TransformComponent{
-        glm::vec3(45,120,-55),
+        glm::vec3(50,100,50),
         glm::vec3(0,0,0)
     });
     registry.addComponent(camEntity, CameraComponent{ .isActive = true});
     registry.addComponent(camEntity, InputReceiverComponent{});
+    registry.addComponent(camEntity, RigidBodyComponent{});
+    registry.addComponent(camEntity, VelocityComponent{ .movementSpeed = 10.f});
+    registry.addComponent(camEntity, ColliderComponent{
+        glm::vec3(.6f, 1.8f, .6f),
+        glm::vec3(0.f, .9f, 0.f)
+    });
+    registry.addComponent(camEntity, PlayerComponent{});
 
-    cameraSystem.initCamera(registry, camEntity, 90, 0);
-    positionCameraForScene(registry, camEntity, selectedScene);
+    cameraSystem.initCamera(registry, camEntity, 90, 0, glm::vec3(0,1.8,0));
+    
+    EntityID spectatorCamera = registry.createEntity();
+    registry.addComponent(spectatorCamera, CameraComponent{});
+    registry.addComponent(spectatorCamera, TransformComponent{
+        glm::vec3(50,100,50),
+        glm::vec3(0,0,0)
+    });
+    registry.addComponent(spectatorCamera, InputReceiverComponent{});
+    registry.addComponent(spectatorCamera, VelocityComponent{ .movementSpeed = 6.f}); //définit la speed camSpec ici si besoin
+
+    //positionCameraForScene(registry, spectatorCamera, selectedScene);
+    cameraSystem.initCamera(registry, spectatorCamera, 90, 0, glm::vec3(0,0,0));
 
     // Create skybox entity
     EntityID skyboxEntity = registry.createEntity();
@@ -485,7 +519,7 @@ int main(int argc, char** argv) {
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     bool isLoading = useInfiniteTerrain;
-    const int TARGET_CHUNKS = useInfiniteTerrain ? 29 * 29 : 0; // (Rayon  * 2 + 1)^2 rayon = 14
+    const int TARGET_CHUNKS = useInfiniteTerrain ? 9 * 9 : 0; // (Rayon  * 2 + 1)^2 rayon = 14
 
     unsigned int numThreads = std::thread::hardware_concurrency();
     if (numThreads == 0) numThreads = 4; // Sécurité
@@ -498,13 +532,10 @@ int main(int argc, char** argv) {
         }
     }
     do {
-        float currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        if (deltaTime > 0.1f) {
-            deltaTime = 0.1f; 
-        }
-        lastFrame = currentFrame;
-        
+        // Calcul du deltaTime
+
+        deltaTimeSystem.update(deltaTimeComponent);
+        float deltaTime = deltaTimeComponent.deltaTime;
 
         // Ensure GLFW processes events early so glfwGetKey states are fresh.
         glfwPollEvents();
@@ -537,33 +568,8 @@ int main(int argc, char** argv) {
                 // Handle debug inputs (day/night cycle, render toggles)
                 debugInputSystem.update(registry, window, deltaTime);
 
-                int displayW, displayH;
-                glfwGetFramebufferSize(window, &displayW, &displayH);
-                
-                ImGuiIO& current_io = ImGui::GetIO();
-                current_io.DisplaySize = ImVec2((float)displayW, (float)displayH);
-
                 ImGui_ImplOpenGL3_NewFrame();
-                ImGui::NewFrame();
-
-                ImGui::SetNextWindowPos(ImVec2(0, 0));
-                ImGui::SetNextWindowSize(current_io.DisplaySize);
-                ImGui::Begin("LoadingScreen", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
-
-                float progress = (float)currentMeshesReady / totalExpectedMeshes;
-                // ----------------------------
-
-                ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.45f));
-                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "GENERATION DES MAILLAGES (MESHES)...");
-                
-                ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.50f));
-                ImGui::Text("Meshes prepares : %d / %d", currentMeshesReady, totalExpectedMeshes);
-                
-                ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.25f, current_io.DisplaySize.y * 0.55f));
-                ImGui::ProgressBar(progress, ImVec2(current_io.DisplaySize.x * 0.5f, 30.0f));
-
-                ImGui::End();
-                ImGui::Render();
+                debugSystem.renderLoadingScreen(window, currentMeshesReady, totalExpectedMeshes);
 
                 glDisable(GL_DEPTH_TEST);
                 ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -576,18 +582,35 @@ int main(int argc, char** argv) {
                 if (windowSystem.update(registry, window)) {
                     inputSystem.resetMouseTracking(window);
                 }
+                    
+                movementSystem.update(registry, deltaTime);
+                physicsSystem.update(registry, deltaTime);
+                collisionSystem.update(registry, deltaTime);
+                interactionSystem.update(registry, terrainSystem);
+
                 pathFindingSystem.update(registry);
                 
                 // Handle debug inputs (day/night cycle, render toggles)
                 debugInputSystem.update(registry, window, deltaTime);
 
-                // Update time system (day/night cycle)
+                // Systèmes physiques et interactions (main)
+                movementSystem.update(registry, deltaTime);
+                physicsSystem.update(registry, deltaTime);
+                collisionSystem.update(registry, deltaTime);
+                interactionSystem.update(registry, terrainSystem);
+                cameraSystem.update(registry, deltaTime); // (Seulement dans le else, comme dans leur code)
+                pathFindingSystem.update(registry);
+                
+                // Handle debug inputs (day/night cycle, render toggles)
+                debugInputSystem.update(registry, window, deltaTime);
+
+                // Update time system (day/night cycle) (HEAD)
                 timeSystem.update(registry, deltaTime);
                 
-                // Calculate lighting state from time
+                // Calculate lighting state from time (HEAD)
                 lightingSystem.update(registry);
                 
-                // Sync components to globals for backward compatibility
+                // Sync components to globals for backward compatibility (HEAD)
                 syncComponentsToGlobals(registry);
 
                 GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
@@ -596,17 +619,19 @@ int main(int argc, char** argv) {
                 glUseProgram(activeProgramID);
                 applyActiveShaderUniforms(activeProgramID, registry);
 
-                // Render terrain
-                renderSystem.update(registry, activeProgramID);
-                
-                // Render skybox
-                skyboxSystem.update(registry, getRenderDebugState(registry));
-                
-                if (debugWireframe) {
+                // Toggle Wireframe JUSTE pour le terrain
+                if (debugSystem.isWireframe()) {
                     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 }
 
+                // Render terrain (Un seul appel suffit !)
+                renderSystem.update(registry, activeProgramID);
+                
+                // Reset Fill mode pour la skybox
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+                // Render skybox
+                skyboxSystem.update(registry, getRenderDebugState(registry));
 
                 ImGui_ImplOpenGL3_NewFrame();
                 debugSystem.update(registry, window, deltaTime, getRenderDebugState(registry));
@@ -617,21 +642,28 @@ int main(int argc, char** argv) {
             }
         } else {
             inputSystem.update(registry, window);
-            cameraSystem.update(registry, deltaTime);
             if (windowSystem.update(registry, window)) {
                 inputSystem.resetMouseTracking(window);
-            }
+            }   
 
-            // Handle debug inputs (day/night cycle, render toggles, AO adjustments)
+            // Systèmes physiques et interactions (main)
+            movementSystem.update(registry, deltaTime);
+            physicsSystem.update(registry, deltaTime);
+            collisionSystem.update(registry, deltaTime);
+            interactionSystem.update(registry, terrainSystem);
+            cameraSystem.update(registry, deltaTime); // (Seulement dans le else, comme dans leur code)
+            pathFindingSystem.update(registry);
+            
+            // Handle debug inputs (day/night cycle, render toggles)
             debugInputSystem.update(registry, window, deltaTime);
 
-            // Update time system (day/night cycle)
+            // Update time system (day/night cycle) (HEAD)
             timeSystem.update(registry, deltaTime);
             
-            // Calculate lighting state from time
+            // Calculate lighting state from time (HEAD)
             lightingSystem.update(registry);
             
-            // Sync components to globals for backward compatibility
+            // Sync components to globals for backward compatibility (HEAD)
             syncComponentsToGlobals(registry);
 
             GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
@@ -640,17 +672,19 @@ int main(int argc, char** argv) {
             glUseProgram(activeProgramID);
             applyActiveShaderUniforms(activeProgramID, registry);
 
-            // Render terrain
-            renderSystem.update(registry, activeProgramID);
-
-            // Render skybox
-            skyboxSystem.update(registry, getRenderDebugState(registry));
-            
-            if (debugWireframe) {
+            // Toggle Wireframe JUSTE pour le terrain
+            if (debugSystem.isWireframe()) {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             }
 
+            // Render terrain (Un seul appel suffit !)
+            renderSystem.update(registry, activeProgramID);
+            
+            // Reset Fill mode pour la skybox
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+            // Render skybox
+            skyboxSystem.update(registry, getRenderDebugState(registry));
 
             ImGui_ImplOpenGL3_NewFrame();
             debugSystem.update(registry, window, deltaTime, getRenderDebugState(registry));

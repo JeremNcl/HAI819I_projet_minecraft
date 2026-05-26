@@ -10,6 +10,7 @@ namespace TestScenes {
 void createSimpleChunk(Registry& registry) {
     printf("=== TEST SCENE: Simple Chunk ===\n");
     printf("Creating a single chunk parent with 16 SubChunks...\n");
+
     const glm::vec3 testBiomeColor(0.48f, 0.74f, 0.42f);
     
     EntityID parentChunkEntity = registry.createEntity();
@@ -53,6 +54,8 @@ void createGeneratedChunk(Registry& registry) {
     TerrainGenerator generator(config);
     const glm::vec3 testBiomeColor(0.48f, 0.74f, 0.42f);
 
+    int chunksGenerated = 0;
+    int radius = 5;
     auto subChunksData = generator.GenerateChunk(0, 0);
 
     EntityID parentChunkEntity = registry.createEntity();
@@ -95,9 +98,6 @@ void createGeneratedChunk(Registry& registry) {
 void createInfiniteTerrainScene(Registry& registry) {
     printf("=== TEST SCENE: Infinite Terrain (TerrainSystem + PathFinding) ===\n");
     printf("Chunks will be generated on-demand by TerrainSystem.\n");
-    
-    // Empty scene - chunks will be generated dynamically by TerrainSystem
-    // during the ECS update loop
 }
 
 }  // namespace TestScenes

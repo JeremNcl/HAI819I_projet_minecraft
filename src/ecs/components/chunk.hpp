@@ -7,6 +7,7 @@
 #include <vector>
 #include <cstdint>
 #include <array>
+#include <bitset>
 
 constexpr size_t SUBCHUNK_SIZE_X = 16;
 constexpr size_t SUBCHUNK_SIZE_Y = 16;
@@ -31,6 +32,29 @@ enum class VoxelType : uint8_t {
     WATER = 13
 };
 
+struct SubChunkVisibility {
+    std::bitset<36> bits;
+
+    SubChunkVisibility() {
+        bits.set();
+    }
+
+    void setConnected(int _faceFrom, int _faceTo, int _connected) {
+        int bit = _faceFrom * 6 + _faceTo;
+        bits[bit] = _connected;
+    }
+
+    bool isConnected(int _faceFrom, int _faceTo) const {
+        if (_faceFrom == -1) return true;
+        int bit = _faceFrom * 6 + _faceTo;
+        return bits[bit];
+    }
+};
+
+inline bool isOpaque(VoxelType type) {
+    return type != VoxelType::AIR && type != VoxelType::WATER && type != VoxelType::LAVA;
+}
+
 struct SubChunkComponent : public Component {
     std::vector<uint8_t> voxels;
     glm::ivec3 subChunkPosition = glm::ivec3(0);
@@ -38,6 +62,8 @@ struct SubChunkComponent : public Component {
 
     int solidBlockCount = 0;
     std::array<glm::vec3, SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Z> biomeColors;
+
+    SubChunkVisibility visibility;
 
     SubChunkComponent() : voxels(SUBVOXEL_ARRAY_SIZE, 0) {
         biomeColors.fill(glm::vec3(1.0f));

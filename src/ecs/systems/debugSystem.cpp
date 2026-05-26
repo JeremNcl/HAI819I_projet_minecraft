@@ -3,19 +3,16 @@
 void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTime, const RenderDebugState& renderState) {
     int displayW, displayH;
     glfwGetFramebufferSize(_window, &displayW, &displayH);
-    
-    // 2. Mettre à jour ImGui IO
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2((float)displayW, (float)displayH);
     
     ImGui::NewFrame();
     
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(350, 450), ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Debug Info", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "=== Camera Debug ===");
-        
-        // Recuperation de la camera
         auto view = registry.view<CameraComponent, TransformComponent>();
         for (EntityID entity : view) {
             auto& cam = registry.getComponent<CameraComponent>(entity);
@@ -49,6 +46,11 @@ void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTim
 
         ImGui::Separator();
         ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.2f, 1.0f), "=== Render Toggles ===");
+        
+        // Checkbox Wireframe du main branch
+        ImGui::Checkbox("Wireframe mode", &m_debugWireframe);
+        
+        // Variables PBR de ta branche
         ImGui::Text("PBR: %s", renderState.usePbrShader ? "ON" : "OFF");
         ImGui::Text("F5 Hemispherical ambient: %s", renderState.useHemisphericalAmbient ? "ON" : "OFF");
         ImGui::Text("F6 Preset: %s", renderState.useReducedAmbient ? "CRISP" : "SOFT");
@@ -77,13 +79,9 @@ void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTim
         int minutes = static_cast<int>((dayTime * 24.0f - hours) * 60.0f);
         ImGui::Text("Time: %02d:%02d", hours, minutes);
         
-        if (ImGui::SliderFloat("DayTime", &dayTime, 0.0f, 1.0f)) {
-            // dayTime modified by UI
-        }
+        if (ImGui::SliderFloat("DayTime", &dayTime, 0.0f, 1.0f)) {}
         ImGui::Text("Speed: %.3f", daySpeed);
-        if (ImGui::SliderFloat("Day Speed", &daySpeed, 0.0f, 1.0f)) {
-            // daySpeed modified by UI
-        }
+        if (ImGui::SliderFloat("Day Speed", &daySpeed, 0.0f, 1.0f)) {}
         ImGui::Text("Paused: %s", dayPaused ? "YES" : "NO");
         if (ImGui::Button(dayPaused ? "Resume" : "Pause")) {
             dayPaused = !dayPaused;
@@ -95,5 +93,35 @@ void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTim
     }
     ImGui::End();
 
+    ImGui::Render();
+}
+
+void DebugSystem::renderLoadingScreen(GLFWwindow* _window, int _currentMeshesReady, int _totalExpectedMeshes) {
+
+    int displayW, displayH;
+    glfwGetFramebufferSize(_window, &displayW, &displayH);
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = ImVec2((float)displayW, (float)displayH);
+    
+    ImGui::NewFrame();
+    
+    ImGuiIO& current_io = ImGui::GetIO();
+
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(current_io.DisplaySize);
+    ImGui::Begin("LoadingScreen", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
+
+    float progress = (_totalExpectedMeshes > 0) ? (float)_currentMeshesReady / _totalExpectedMeshes : 1.0f;
+
+    ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.45f));
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "GENERATION DES MAILLAGES (MESHES)...");
+    
+    ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.35f, current_io.DisplaySize.y * 0.50f));
+    ImGui::Text("Meshes prepares : %d / %d", _currentMeshesReady, _totalExpectedMeshes);
+    
+    ImGui::SetCursorPos(ImVec2(current_io.DisplaySize.x * 0.25f, current_io.DisplaySize.y * 0.55f));
+    ImGui::ProgressBar(progress, ImVec2(current_io.DisplaySize.x * 0.5f, 30.0f));
+
+    ImGui::End();
     ImGui::Render();
 }

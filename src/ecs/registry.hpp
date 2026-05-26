@@ -9,6 +9,7 @@
 #include <memory>
 #include <stdexcept>
 #include <limits>
+#include <iostream>
 
 // Sparse set storage for a single component type
 class ComponentStorage {
@@ -77,8 +78,7 @@ public:
 
     const T& get(EntityID entity) const {
         auto it = sparse.find(entity);
-        if (it == sparse.end()) {
-            throw std::out_of_range("Entity does not have this component");
+        if (it == sparse.end()) {;
         }
         return components[it->second];
     }
@@ -254,5 +254,77 @@ public:
     template <typename T>
     View<T> view() {
         return View<T>(getStorageConst<T>());
-    } 
+    }
+    
+    template <typename T1, typename T2, typename T3>
+    class View3 {
+    private:
+        const SparseSet<T1>* s1;
+        const SparseSet<T2>* s2;
+        const SparseSet<T3>* s3;
+
+    public:
+        View3(const SparseSet<T1>* ss1, const SparseSet<T2>* ss2, const SparseSet<T3>* ss3) 
+            : s1(ss1), s2(ss2), s3(ss3) {}
+
+        class Iterator {
+        private:
+            const std::vector<EntityID>* dense;
+            const SparseSet<T2>* s2;
+            const SparseSet<T3>* s3;
+            size_t index;
+
+            void skipInvalid() {
+                while (index < dense->size() && 
+                      (!s2->hasEntity((*dense)[index]) || !s3->hasEntity((*dense)[index]))) {
+                    ++index;
+                }
+            }
+
+        public:
+            Iterator(const std::vector<EntityID>* d, const SparseSet<T2>* ss2, const SparseSet<T3>* ss3, size_t idx)
+                : dense(d), s2(ss2), s3(ss3), index(idx) {
+                skipInvalid();
+            }
+
+            bool operator!=(const Iterator& other) const {
+                return index != other.index;
+            }
+
+            EntityID operator*() const {
+                return (*dense)[index];
+            }
+
+            Iterator& operator++() {
+                ++index;
+                skipInvalid();
+                return *this;
+            }
+        };
+
+        Iterator begin() const {
+            if (!s1 || !s2 || !s3 || s1->getDense().empty()) {
+                static const std::vector<EntityID> emptyDense;
+                return Iterator(&emptyDense, s2, s3, 0);
+            }
+            return Iterator(&s1->getDense(), s2, s3, 0);
+        }
+
+        Iterator end() const {
+            if (!s1 || !s2 || !s3 || s1->getDense().empty()) {
+                static const std::vector<EntityID> emptyDense;
+                return Iterator(&emptyDense, s2, s3, 0);
+            }
+            return Iterator(&s1->getDense(), s2, s3, s1->getDense().size());
+        }
+    };
+
+    template <typename T1, typename T2, typename T3>
+    View3<T1, T2, T3> view() {
+        auto ss1 = getStorageConst<T1>();
+        auto ss2 = getStorageConst<T2>();
+        auto ss3 = getStorageConst<T3>();
+
+        return View3<T1, T2, T3>(ss1, ss2, ss3);
+    }
 };

@@ -7,6 +7,20 @@ InputSystem::InputSystem(GLFWwindow* _window){
     lastY = height * .5f;
 }
 
+bool InputSystem::keyPressedOnce(GLFWwindow* _window, int _key) {
+    bool isPressed = (glfwGetKey(_window, _key) == GLFW_PRESS);
+    bool triggered = isPressed && !m_previousKeyState[_key];
+    m_previousKeyState[_key] = isPressed;
+    return triggered;
+}
+
+bool InputSystem::mousePressedOnce(GLFWwindow* _window, int _button) {
+    bool isPressed = (glfwGetMouseButton(_window, _button) == GLFW_PRESS);
+    bool triggered = isPressed && !m_previousMouseState[_button];
+    m_previousMouseState[_button] = isPressed;
+    return triggered;
+}
+
 void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
 
     Registry::View<InputReceiverComponent> view = _registry.view<InputReceiverComponent>();
@@ -26,7 +40,19 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
     lastX = mouseX;
     lastY = mouseY;
 
-    static bool f11PressedLastFrame = false;
+    bool leftClick = mousePressedOnce(_window, GLFW_MOUSE_BUTTON_LEFT);
+    bool rightClick = mousePressedOnce(_window, GLFW_MOUSE_BUTTON_RIGHT);
+
+    bool toggleFullscreen = keyPressedOnce(_window, GLFW_KEY_F11);
+    bool toggleWireframe = keyPressedOnce(_window, GLFW_KEY_F5);
+    bool togglePbr = keyPressedOnce(_window, GLFW_KEY_F10);
+    bool toggleTBN = keyPressedOnce(_window, GLFW_KEY_F9);
+    bool toggleNormalMap = keyPressedOnce(_window, GLFW_KEY_F8);
+    bool toggleDiffuse = keyPressedOnce(_window, GLFW_KEY_F7);
+    bool toggleAmbient = keyPressedOnce(_window, GLFW_KEY_F6);
+
+    bool toggleCameraSwap = keyPressedOnce(_window, GLFW_KEY_F4);
+
     bool f11Pressed = (glfwGetKey(_window, GLFW_KEY_F11) == GLFW_PRESS);
 
     for (EntityID entity : view) {
@@ -37,14 +63,20 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         input.moveBackward = (glfwGetKey(_window, GLFW_KEY_S) == GLFW_PRESS);
         input.moveLeft = (glfwGetKey(_window, GLFW_KEY_A) == GLFW_PRESS);
         input.moveRight = (glfwGetKey(_window, GLFW_KEY_D) == GLFW_PRESS);
-        input.moveUp = (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS);
-        input.moveDown = (glfwGetKey(_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS);
+        input.jump = (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS);
+        input.sprint = (glfwGetKey(_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
 
-        if (f11Pressed && !f11PressedLastFrame) {
-            input.toggleFullscreen = true;
-        } else {
-            input.toggleFullscreen = false;
-        }
+        input.leftClick = leftClick;
+        input.rightClick = rightClick;
+
+        input.toggleFullscreen = toggleFullscreen;
+        input.toggleWireframe = toggleWireframe;
+        input.togglePbr = togglePbr;
+        input.toggleTBN = toggleTBN;
+        input.toggleNormalMap = toggleNormalMap;
+        input.toggleDiffuse = toggleDiffuse;
+        input.toggleAmbient = toggleAmbient;
+        input.toggleCameraSwap = toggleCameraSwap;
 
         input.mouseX = deltaX;
         input.mouseY = deltaY;

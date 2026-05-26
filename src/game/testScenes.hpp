@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ecs/registry.hpp"
+#include "../ecs/registry.hpp"
 
 namespace TestScenes {
     void createSimpleChunk(Registry& registry);

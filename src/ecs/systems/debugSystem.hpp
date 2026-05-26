@@ -5,10 +5,13 @@
 #include "ecs/registry.hpp"
 #include "ecs/components/camera.hpp"
 #include "ecs/components/transform.hpp"
+#include "ecs/components/inputReceiver.hpp"
 
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <GLFW/glfw3.h>
+#include <array>
+#include <iostream>
 
 struct RenderDebugState {
     bool usePbrShader = true;
@@ -47,8 +50,13 @@ class DebugSystem {
         int frameCount = 0;
         float frameTimeAccum = 0.0f;
 
+        bool m_debugWireframe = false;
+
     public:
         void update(Registry& _registry, GLFWwindow* _window, float _deltaTime, const RenderDebugState& renderState);
+        void renderLoadingScreen(GLFWwindow* _window, int _currentMeshesReady, int _totalExpectedMeshes);
+
+        bool isWireframe() const { return m_debugWireframe; }
 };
 
 #endif

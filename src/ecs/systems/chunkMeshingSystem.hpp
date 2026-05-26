@@ -88,4 +88,5 @@ private:
                          int uSign,
                          int vSign) const;
     
+    void computeSubChunkVisibility(SubChunkComponent& subChunk);
 };

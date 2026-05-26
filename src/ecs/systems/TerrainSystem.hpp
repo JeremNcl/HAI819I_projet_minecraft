@@ -21,8 +21,8 @@ private:
     
     std::map<std::pair<int, int>, EntityID> activeChunks;
     
-    int renderDistance = 14;
-    int unloadDistance = 18;
+    int renderDistance = 4;
+    int unloadDistance = 6;
 
     void destroyChunkRecursive(Registry& registry, EntityID parentEntity) {
         if (registry.hasComponent<ChunkComponent>(parentEntity)) {
@@ -165,6 +165,7 @@ public:
                     registry.addComponent(subChunkEntity, TransformComponent(glm::vec3(0.0f,0.0f,0.0f)));
                     
                     chunkManager.subChunks[subY] = subChunkEntity;
+                    
                     if (solidCount > 0) {
                         registry.getComponent<SubChunkComponent>(subChunkEntity).meshDirty = true;
                         requestMesh(subChunkEntity);
@@ -180,7 +181,7 @@ public:
                     {result.x + 1, result.z}, {result.x - 1, result.z},
                     {result.x, result.z + 1}, {result.x, result.z - 1}
                 };
-                for (const auto& n : neighbors) {
+                /* for (const auto& n : neighbors) {
                     if (activeChunks.find(n) != activeChunks.end()) {
                         EntityID neighborParent = activeChunks[n];
                         if (neighborParent != 0 && registry.hasComponent<ChunkComponent>(neighborParent)) {
@@ -198,10 +199,32 @@ public:
                             }
                         }
                     }
+                } */
+               for (const auto& n : neighbors) {
+                    if (activeChunks.find(n) != activeChunks.end()) {
+                        EntityID neighborParent = activeChunks[n];
+                        if (neighborParent != 0 && registry.hasComponent<ChunkComponent>(neighborParent)) {
+                            auto& neighborChunk = registry.getComponent<ChunkComponent>(neighborParent);
+                            
+                            for (int subY = 0; subY < 16; ++subY) {
+                                EntityID mySubID = chunkManager.subChunks[subY];
+                                EntityID neighborSubID = neighborChunk.subChunks[subY];
+
+                                if (mySubID != 0 && neighborSubID != 0) {
+                                    auto& mySub = registry.getComponent<SubChunkComponent>(mySubID);
+                                    auto& neighborSub = registry.getComponent<SubChunkComponent>(neighborSubID);
+                                    
+                                    if (mySub.solidBlockCount > 0 && neighborSub.solidBlockCount > 0 && !neighborSub.meshDirty) {
+                                        neighborSub.meshDirty = true;
+                                        requestMesh(neighborSubID);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
-        
     }
 
     EntityID getSubChunkAt(int x, int y, int z, Registry& registry) {
@@ -215,5 +238,57 @@ public:
             }
         }
         return 0;
+    }
+
+    void setBlock(Registry& registry, int globalX, int globalY, int globalZ, VoxelType type) {
+    
+        if (globalY < 0 || globalY >= 256) return;
+        
+        int chunkX = static_cast<int>(std::floor(globalX / 16.0f));
+        int chunkZ = static_cast<int>(std::floor(globalZ / 16.0f));
+        int subY = globalY / 16;
+
+        int localX = globalX - (chunkX * 16);
+        int localY = globalY % 16;
+        int localZ = globalZ - (chunkZ * 16);
+
+        EntityID mySubID = getSubChunkAt(chunkX, subY, chunkZ, registry);
+        if (mySubID == 0) return;
+
+        auto& mySub = registry.getComponent<SubChunkComponent>(mySubID);
+
+        VoxelType oldType = mySub.getVoxel(localX, localY, localZ);
+        if (oldType != VoxelType::AIR && type == VoxelType::AIR) {
+            mySub.solidBlockCount--;
+        } else if (oldType == VoxelType::AIR && type != VoxelType::AIR) {
+            mySub.solidBlockCount++;
+        }
+
+        mySub.setVoxel(localX, localY, localZ, type);
+        
+        if (!mySub.meshDirty) {
+            mySub.meshDirty = true;
+            requestMesh(mySubID);
+        }
+
+        auto dirtyNeighbor = [&](int nX, int nSubY, int nZ) {
+            EntityID nID = getSubChunkAt(nX, nSubY, nZ, registry);
+            if (nID != 0) {
+                auto& nSub = registry.getComponent<SubChunkComponent>(nID);
+                if (!nSub.meshDirty) {
+                    nSub.meshDirty = true;
+                    requestMesh(nID);
+                }
+            }
+        };
+
+        if (localX == 0) dirtyNeighbor(chunkX - 1, subY, chunkZ);
+        if (localX == 15) dirtyNeighbor(chunkX + 1, subY, chunkZ);
+
+        if (localZ == 0) dirtyNeighbor(chunkX, subY, chunkZ - 1);
+        if (localZ == 15) dirtyNeighbor(chunkX, subY, chunkZ + 1);
+
+        if (localY == 0 && subY > 0) dirtyNeighbor(chunkX, subY - 1, chunkZ);
+        if (localY == 15 && subY < 15) dirtyNeighbor(chunkX, subY + 1, chunkZ);
     }
 };

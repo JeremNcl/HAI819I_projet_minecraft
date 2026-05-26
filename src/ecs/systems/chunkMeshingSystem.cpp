@@ -23,6 +23,11 @@ VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData,
     if (z < 0) { neighborPos.z -= 1; localZ = 15; }
     else if (z >= 16) { neighborPos.z += 1; localZ = 0; }
 
+    /* auto it = worldMap.subChunkEntities.find(neighborPos);
+    if (it != worldMap.subChunkEntities.end()) {
+        const SubChunkComponent& neighborComponent = registry.getComponent<SubChunkComponent>(it->second);
+        return neighborComponent.getVoxel(localX, localY, localZ);
+ */
     auto it = std::lower_bound(cache.begin(), cache.end(), neighborPos, [](const SubChunkComponent* comp, const glm::ivec3& pos) {
         if (comp->subChunkPosition.x != pos.x) return comp->subChunkPosition.x < pos.x;
         if (comp->subChunkPosition.y != pos.y) return comp->subChunkPosition.y < pos.y;
@@ -213,6 +218,14 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
     }
 }
 
+/* void ChunkMeshingSystem::generateMesh(Registry& registry, EntityID entity,
+                                      SubChunkComponent& voxelData,
+                                      MeshComponent& mesh,
+                                      const WorldMapComponent& worldMap) {
+    std::vector<Vertex> vertices;
+    std::vector<GLuint> indices;
+} */
+
 bool ChunkMeshingSystem::isMeshingComplete(Registry& registry) const {
     auto view = registry.view<SubChunkComponent>();
     
@@ -241,13 +254,16 @@ int ChunkMeshingSystem::getCompletedMeshCount(Registry& registry) const {
 MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID entity,
                                       SubChunkComponent& voxelData,
                                       const subChunkCache& cache) {
+
+    computeSubChunkVisibility(voxelData);
+
     MeshData result;
     int dims[3] = {SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z};
 
     glm::vec3 worldOffset(
-        voxelData.subChunkPosition.x * 16.0f,
-        voxelData.subChunkPosition.y * 16.0f,
-        voxelData.subChunkPosition.z * 16.0f
+        voxelData.subChunkPosition.x * 16.f,
+        voxelData.subChunkPosition.y * 16.f,
+        voxelData.subChunkPosition.z * 16.f
     );
 
 
@@ -476,6 +492,86 @@ void ChunkMeshingSystem::uploadMeshToGPU(MeshComponent& mesh, const MeshData& da
 
     mesh.indexCount = data.indices.size();
     glBindVertexArray(0);
+}
+
+// Occlusion Culling
+void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) {
+    int solidCount = subChunk.solidBlockCount;
+
+    if (solidCount == 0) {
+        subChunk.visibility.bits.set();
+        return;
+    }
+
+    if (solidCount == 4096) {
+        subChunk.visibility.bits.reset();
+        return;
+    }
+
+    subChunk.visibility.bits.reset();
+
+    std::vector<bool> visited(4096, false);
+    auto getIndex = [](int x, int y, int z) { return x + (z * 16) + (y * 16 * 16); };
+
+    const int dx[6] = {-1, 1, 0, 0, 0, 0};
+    const int dy[6] = {0, 0, -1, 1, 0, 0};
+    const int dz[6] = {0, 0, 0, 0, -1, 1};
+
+    for (int y = 0; y < 16; ++y) {
+        for (int z = 0; z < 16; ++z) {
+            for (int x = 0; x < 16; ++x) {
+                int index = getIndex(x, y, z);
+
+                if (visited[index] || !isOpaque(subChunk.getVoxel(x, y, z))) continue;
+
+                std::vector<int> queue;
+                queue.reserve(256);
+                queue.push_back(index);
+                visited[index] = true;
+
+                std::array<bool, 6> facesTouched = {false, false, false, false, false, false};
+                size_t head = 0;
+
+                while (head < queue.size()) {
+                    int currIndex = queue[head++];
+                    
+                    int cx = currIndex % 16;
+                    int cz = (currIndex / 16) % 16;
+                    int cy = currIndex / (16 * 16);
+
+                    if (cx == 0) facesTouched[0] = true;
+                    if (cx == 15) facesTouched[1] = true;
+                    if (cy == 0) facesTouched[2] = true;
+                    if (cy == 15) facesTouched[3] = true;
+                    if (cz == 0) facesTouched[4] = true;
+                    if (cz == 15) facesTouched[5] = true;
+
+                    for (int i = 0; i < 6; ++i) {
+                        int nx = cx + dx[i];
+                        int ny = cy + dy[i];
+                        int nz = cz + dz[i];
+
+                        if (nx >= 0 && nx < 16 && ny >= 0 && ny < 16 && nz >= 0 && nz < 16) {
+                            int nIndex = getIndex(nx, ny, nz);
+                            if (!visited[nIndex] && !isOpaque(subChunk.getVoxel(nx, ny, nz))) {
+                                visited[nIndex] = true;
+                                queue.push_back(nIndex);
+                            }
+                        }
+                    }
+                }
+
+                for (int i = 0; i < 6; ++i) {
+                    if (!facesTouched[i]) continue;
+                    for (int j = 0; j < 6; ++j) {
+                        if (facesTouched[j]) {
+                            subChunk.visibility.setConnected(i, j, true);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 void ChunkMeshingSystem::update(Registry& registry) {

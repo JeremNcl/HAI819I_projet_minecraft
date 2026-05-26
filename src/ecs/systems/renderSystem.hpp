@@ -5,8 +5,11 @@
 #include "ecs/components/transform.hpp"
 #include "ecs/components/chunk.hpp"
 #include "ecs/components/lightingStateComponent.hpp"
+#include "engine/render/shader.hpp"
+
 #include <glm/glm.hpp>
 #include <array>
+#include <unordered_map>
 
 class RenderSystem {
 public:
@@ -18,14 +21,7 @@ public:
     void update(Registry& registry, GLuint shaderProgram);
 
 private:
-    void renderMesh(GLuint shaderProgram,
-                    GLint locMVP,
-                    const MeshComponent& mesh,
-                    const glm::mat4& modelMatrix,
-                    const glm::mat4& viewMatrix,
-                    const glm::mat4& projectionMatrix,
-                    const glm::vec3& lightColor,
-                    const glm::vec3& lightDirection);
+    std::unordered_map<GLuint, ShaderUniforms> programUniformsCache;
                     
     void extractFrustumPlanes(const glm::mat4& vpMatrix, std::array<glm::vec4, 6>& planes);
     bool isAABBInFrustum(const glm::vec3& minBounds, const glm::vec3& maxBounds, const std::array<glm::vec4, 6>& planes);
