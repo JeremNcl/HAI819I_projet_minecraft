@@ -498,19 +498,10 @@ void ChunkMeshingSystem::uploadMeshToGPU(MeshComponent& mesh, const MeshData& da
 // Occlusion Culling
 void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) {
     int solidCount = subChunk.solidBlockCount;
-
-    if (solidCount == 0) {
-        subChunk.visibility.bits.set();
-        return;
-    }
-
-    if (solidCount == 4096) {
-        subChunk.visibility.bits.reset();
-        return;
-    }
+    if (solidCount == 0) { subChunk.visibility.bits.set(); return; }
+    if (solidCount == 4096) { subChunk.visibility.bits.reset(); return; }
 
     subChunk.visibility.bits.reset();
-
     std::vector<bool> visited(4096, false);
     auto getIndex = [](int x, int y, int z) { return x + (z * 16) + (y * 16 * 16); };
 
@@ -518,12 +509,20 @@ void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) 
     const int dy[6] = {0, 0, -1, 1, 0, 0};
     const int dz[6] = {0, 0, 0, 0, -1, 1};
 
+    // Helper pour savoir ce qui est traversable par la visibilité
+    auto isTraversable = [](VoxelType type) {
+        // On veut que le BFS puisse "voir" à travers l'air et les feuilles
+        return type == VoxelType::AIR || type == VoxelType::LEAVES;
+    };
+
     for (int y = 0; y < 16; ++y) {
         for (int z = 0; z < 16; ++z) {
             for (int x = 0; x < 16; ++x) {
                 int index = getIndex(x, y, z);
+                VoxelType type = subChunk.getVoxel(x, y, z);
 
-                if (visited[index] || !isOpaque(subChunk.getVoxel(x, y, z))) continue;
+                // BFS doit pouvoir commencer sur des blocs non opaques OU des feuilles
+                if (visited[index] || isOpaque(type)) continue;
 
                 std::vector<int> queue;
                 queue.reserve(256);
@@ -535,11 +534,11 @@ void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) 
 
                 while (head < queue.size()) {
                     int currIndex = queue[head++];
-                    
                     int cx = currIndex % 16;
                     int cz = (currIndex / 16) % 16;
                     int cy = currIndex / (16 * 16);
 
+                    // Mise à jour des faces touchées
                     if (cx == 0) facesTouched[0] = true;
                     if (cx == 15) facesTouched[1] = true;
                     if (cy == 0) facesTouched[2] = true;
@@ -556,11 +555,8 @@ void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) 
                             int nIndex = getIndex(nx, ny, nz);
                             VoxelType neighborType = subChunk.getVoxel(nx, ny, nz);
 
-                            // MODIFICATION : On autorise le BFS à traverser les feuilles
-                            // Cela permet d'explorer l'intérieur de l'arbre et les faces cachées
-                            bool canTraverse = !isOpaque(neighborType) || (neighborType == VoxelType::LEAVES);
-                            
-                            if (!visited[nIndex] && canTraverse) {
+                            // Le BFS traverse tout ce qui n'est pas "solide" (opaque)
+                            if (!visited[nIndex] && isTraversable(neighborType)) {
                                 visited[nIndex] = true;
                                 queue.push_back(nIndex);
                             }
