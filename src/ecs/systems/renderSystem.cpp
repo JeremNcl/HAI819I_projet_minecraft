@@ -167,3 +167,21 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::v
     glBindVertexArray(0);
     glUseProgram(0);
 }
+
+// Overload that reads lightColor and lightDirection from ECS LightingStateComponent
+void RenderSystem::update(Registry& registry, GLuint shaderProgram) {
+    auto lightingView = registry.view<LightingStateComponent>();
+    
+    glm::vec3 lightColor{1.0f};
+    glm::vec3 lightDirection{0.0f, 1.0f, 0.0f};
+    
+    if (!lightingView.isEmpty()) {
+        EntityID lightingEntity = *lightingView.begin();
+        LightingStateComponent& lightingState = registry.getComponent<LightingStateComponent>(lightingEntity);
+        lightColor = lightingState.lightColor;
+        lightDirection = lightingState.lightDirection;
+    }
+    
+    // Call the original update with extracted values
+    update(registry, shaderProgram, lightColor, lightDirection);
+}
