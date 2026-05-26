@@ -251,9 +251,7 @@ int ChunkMeshingSystem::getCompletedMeshCount(Registry& registry) const {
 }
 
 
-MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID entity,
-                                      SubChunkComponent& voxelData,
-                                      const subChunkCache& cache) {
+MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID entity, SubChunkComponent& voxelData, const subChunkCache& cache) {
 
     computeSubChunkVisibility(voxelData);
 
@@ -352,7 +350,9 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
                             int nz = x[2] + (isPositive ? q[2] : -q[2]);
 
                             VoxelType neighbor = getVoxelGlobal(voxelData, nx, ny, nz, cache);
-                            if (neighbor == VoxelType::AIR) {
+                            
+                            bool isLeaves = (current == VoxelType::LEAVES);
+                            if (neighbor == VoxelType::AIR || (current == VoxelType::LEAVES)) {
                                 mask[maskIndex] = current;
                                 // Build signature from precomputed corner AO values
                                 int iCell = x[u];
@@ -384,7 +384,8 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
                             int w = 1;
                             while (i + w < dims[u]
                                    && mask[(i + w) + j * dims[u]] == type
-                                   && aoMask[(i + w) + j * dims[u]] == aoSignature) {
+                                   && aoMask[(i + w) + j * dims[u]] == aoSignature
+                                   && type != VoxelType::LEAVES) {
                                 w++;
                             }
 
@@ -553,7 +554,13 @@ void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) 
 
                         if (nx >= 0 && nx < 16 && ny >= 0 && ny < 16 && nz >= 0 && nz < 16) {
                             int nIndex = getIndex(nx, ny, nz);
-                            if (!visited[nIndex] && !isOpaque(subChunk.getVoxel(nx, ny, nz))) {
+                            VoxelType neighborType = subChunk.getVoxel(nx, ny, nz);
+
+                            // MODIFICATION : On autorise le BFS à traverser les feuilles
+                            // Cela permet d'explorer l'intérieur de l'arbre et les faces cachées
+                            bool canTraverse = !isOpaque(neighborType) || (neighborType == VoxelType::LEAVES);
+                            
+                            if (!visited[nIndex] && canTraverse) {
                                 visited[nIndex] = true;
                                 queue.push_back(nIndex);
                             }

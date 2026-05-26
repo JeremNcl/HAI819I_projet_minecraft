@@ -9,7 +9,7 @@ GLuint BlockTextureManager::colorArrayID = 0;
 GLuint BlockTextureManager::normalArrayID = 0;
 GLuint BlockTextureManager::metallicArrayID = 0;
 int BlockTextureManager::sliceCount = 0;
-std::array<float, 5> BlockTextureManager::normalStrengths = {0.28f, 0.28f, 0.28f, 0.28f, 0.28f};
+std::array<float, 16> BlockTextureManager::normalStrengths = {0.28f}; // Initialisé à 16
 
 namespace {
 constexpr const char* kSourceTextureRoot = "/home/jerem/Documents/M1_IMAGINE_2025-2026/Semestre8/Moteur_De_Jeux/Projet/Vanilla-RTX-Opus-1.26.13/textures/blocks";
@@ -19,7 +19,7 @@ bool appendTextureSet(const std::string& textureSetPath,
                       std::vector<std::string>& colorPaths,
                       std::vector<std::string>& normalPaths,
                       std::vector<std::string>& metallicPaths,
-                      std::array<float, 5>& strengths,
+                      std::array<float, 16>& strengths,
                       size_t targetIndex) {
     ImportedTextureSet importedSet;
     if (!PackTextureImporter::importTextureSet(textureSetPath, kLocalTextureRoot, importedSet)) {
@@ -39,122 +39,86 @@ bool appendTextureSet(const std::string& textureSetPath,
 } // namespace
 
 void BlockTextureManager::initialize() {
-    std::cout << "Initializing Block Texture Arrays..." << std::endl;
+    std::cout << "Initializing Block Texture Arrays (16 slots)..." << std::endl;
 
     BlockDefinitionRegistry::initialize();
 
-    std::vector<std::string> colorPaths(5);
-    std::vector<std::string> normalPaths(5);
-    std::vector<std::string> metallicPaths(5);
-    normalStrengths = {0.28f, 0.28f, 0.28f, 0.28f, 0.28f};
+    // Allocation de 16 slots pour anticiper tous les blocs de l'énumération
+    std::vector<std::string> colorPaths(16, "");
+    std::vector<std::string> normalPaths(16, "");
+    std::vector<std::string> metallicPaths(16, "");
+    normalStrengths.fill(0.28f);
 
-    const bool importedStone = appendTextureSet(
-        std::string(kSourceTextureRoot) + "/stone.texture_set.json",
-        colorPaths,
-        normalPaths,
-        metallicPaths,
-        normalStrengths,
-        0);
+    // ========================================================
+    // INDEX 0 : TEXTURE D'ERREUR (FALLBACK ABSOLU)
+    // ========================================================
+    colorPaths[0]    = "assets/textures/blocks/error.tga";
+    normalPaths[0]   = "assets/textures/blocks/error_normal.tga";
+    metallicPaths[0] = "assets/textures/blocks/error_mer.tga";
+    normalStrengths[0] = 0.0f; // Surface plate pour l'erreur
 
-    const bool importedDirt = appendTextureSet(
-        std::string(kSourceTextureRoot) + "/dirt.texture_set.json",
-        colorPaths,
-        normalPaths,
-        metallicPaths,
-        normalStrengths,
-        1);
+    // ========================================================
+    // CHARGEMENT DU PACK PBR (DÉCALAGE DE +1 POUR LES ANCIENS)
+    // ========================================================
+    bool success = true;
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/stone.texture_set.json",     colorPaths, normalPaths, metallicPaths, normalStrengths, 1);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/dirt.texture_set.json",      colorPaths, normalPaths, metallicPaths, normalStrengths, 2);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/grass_top.texture_set.json",  colorPaths, normalPaths, metallicPaths, normalStrengths, 3);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/grass_side.texture_set.json", colorPaths, normalPaths, metallicPaths, normalStrengths, 4);
+    
+    // Nouveaux blocs demandés
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/sand.texture_set.json",       colorPaths, normalPaths, metallicPaths, normalStrengths, 5);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/log_oak_top.texture_set.json", colorPaths, normalPaths, metallicPaths, normalStrengths, 6);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/log_oak.texture_set.json",     colorPaths, normalPaths, metallicPaths, normalStrengths, 7); // Écorce latérale
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/leaves_oak.texture_set.json",  colorPaths, normalPaths, metallicPaths, normalStrengths, 8);
 
-    const bool importedGrassTop = appendTextureSet(
-        std::string(kSourceTextureRoot) + "/grass_top.texture_set.json",
-        colorPaths,
-        normalPaths,
-        metallicPaths,
-        normalStrengths,
-        2);
-
-    const bool importedGrassSide = appendTextureSet(
-        std::string(kSourceTextureRoot) + "/grass_side.texture_set.json",
-        colorPaths,
-        normalPaths,
-        metallicPaths,
-        normalStrengths,
-        3);
-
-    if (!importedStone || !importedDirt || !importedGrassTop || !importedGrassSide) {
-        std::cerr << "Pack import failed for the first block set, falling back to local assets." << std::endl;
-        colorPaths = {
-            "assets/textures/blocks/stone.tga",
-            "assets/textures/blocks/dirt.tga",
-            "assets/textures/blocks/grass_top.tga",
-            "assets/textures/blocks/grass_side.tga",
-            ""
-        };
-        normalPaths = {
-            "assets/textures/blocks/stone_normal.tga",
-            "assets/textures/blocks/dirt_normal.tga",
-            "assets/textures/blocks/grass_top_normal.tga",
-            "assets/textures/blocks/grass_side_normal.tga",
-            ""
-        };
-        metallicPaths = {
-            "assets/textures/blocks/stone_mer.tga",
-            "assets/textures/blocks/dirt_mer.tga",
-            "assets/textures/blocks/grass_top_mer.tga",
-            "assets/textures/blocks/grass_side_mer.tga",
-            ""
-        };
-        normalStrengths = {0.22f, 0.45f, 0.42f, 0.38f, 0.28f};
+    if (!success) {
+        std::cerr << "Pack PBR incomplet dans le dossier source, application du fallback local." << std::endl;
+        // Remplir manuellement les index si le dossier absolu est introuvable
+        colorPaths[1] = "assets/textures/blocks/stone.tga";
+        colorPaths[2] = "assets/textures/blocks/dirt.tga";
+        colorPaths[3] = "assets/textures/blocks/grass_top.tga";
+        colorPaths[4] = "assets/textures/blocks/grass_side.tga";
+        colorPaths[5] = "assets/textures/blocks/sand.tga";
+        colorPaths[6] = "assets/textures/blocks/log_oak_top.tga";
+        colorPaths[7] = "assets/textures/blocks/log_oak.tga";
+        colorPaths[8] = "assets/textures/blocks/leaves_oak.tga";
     }
 
-    // Chargement des 3 Texture Arrays
-    colorArrayID = loadTextureArray(colorPaths);
-    normalArrayID = loadTextureArray(normalPaths);
+    colorArrayID    = loadTextureArray(colorPaths);
+    normalArrayID   = loadTextureArray(normalPaths);
     metallicArrayID = loadTextureArray(metallicPaths);
 
-    // Enregistrer le nombre de slices attendues pour diagnostics / mapping
     sliceCount = static_cast<int>(colorPaths.size());
-
-    if (colorArrayID == 0 || normalArrayID == 0 || metallicArrayID == 0) {
-        std::cerr << "ERREUR CRITIQUE: Echec de la création des Texture Arrays." << std::endl;
-    } else {
-        std::cout << "Texture Arrays générés avec succès !" << std::endl;
-    }
 }
 
 void BlockTextureManager::bindArrays(GLuint shaderProgram) {
     glUseProgram(shaderProgram);
 
-    // Color Array sur l'Unité 0
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D_ARRAY, colorArrayID);
-    glUniform1i(glGetUniformLocation(shaderProgram, "textureSampler"), 0);
     glUniform1i(glGetUniformLocation(shaderProgram, "colorMap"), 0);
 
-    // Normal Array sur l'Unité 1
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D_ARRAY, normalArrayID);
     glUniform1i(glGetUniformLocation(shaderProgram, "normalMap"), 1);
 
-    // Metallic Array sur l'Unité 2
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D_ARRAY, metallicArrayID);
     glUniform1i(glGetUniformLocation(shaderProgram, "metallicMap"), 2);
 
     GLint normalStrengthsLoc = glGetUniformLocation(shaderProgram, "normalStrengths");
     if (normalStrengthsLoc >= 0) {
-        // Apply a small global reduction to normal map influence for overall softer normals
-        constexpr float kNormalGlobalFactor = 0.85f; // 85% of original
-        std::array<float, 5> scaled = normalStrengths;
+        constexpr float kNormalGlobalFactor = 0.85f;
+        std::array<float, 16> scaled = normalStrengths;
         for (size_t i = 0; i < scaled.size(); ++i) scaled[i] *= kNormalGlobalFactor;
         glUniform1fv(normalStrengthsLoc, static_cast<GLsizei>(scaled.size()), scaled.data());
     }
     
-    // Rétablir l'unité active par défaut
     glActiveTexture(GL_TEXTURE0);
 }
 
 void BlockTextureManager::cleanup() {
-    std::cout << "Cleaning up Block Texture Arrays..." << std::endl;
     glDeleteTextures(1, &colorArrayID);
     glDeleteTextures(1, &normalArrayID);
     glDeleteTextures(1, &metallicArrayID);
@@ -164,8 +128,7 @@ int BlockTextureManager::getTextureSliceIndex(VoxelType type, int axis, bool isP
     int idx = BlockDefinitionRegistry::getTextureSliceIndex(type, axis, isPositive);
     if (sliceCount <= 0) return idx;
     if (idx >= sliceCount) {
-        std::cerr << "Warning: requested texture slice " << idx << " out of range (" << sliceCount << "). Clamping to 0." << std::endl;
-        return 0;
+        return 0; // Sécurité : retourne l'erreur si hors limites
     }
     return idx;
 }
