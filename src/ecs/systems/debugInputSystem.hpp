@@ -3,6 +3,7 @@
 #define DEBUGINPUTSYSTEM_HPP
 
 #include <GLFW/glfw3.h>
+#include "../../ecs/registry.hpp"
 
 // Global debug variables (controlled by this system)
 extern float dayTime;
@@ -59,8 +60,8 @@ class DebugInputSystem {
     public:
         DebugInputSystem() = default;
 
-        // Update all debug inputs (needs deltaTime for repeat timing)
-        void update(GLFWwindow* window, float deltaTime);
+        // Update all debug inputs (needs registry for TimeComponent, LightingStateComponent)
+        void update(Registry& registry, GLFWwindow* window, float deltaTime);
 };
 
 #endif

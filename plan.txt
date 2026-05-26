@@ -24,46 +24,103 @@
 
 8c. ✅ Inputs avec repeat support (flèches directionnelles) pour debug/iteration rapide.
 
-    Phase 2.5 - Améliorations visuelles du contraste (dépend de 2, optionnel avant 3)
+    Phase 2.5 - Skybox Dynamique (dépend de 2) [✅ COMPLÉTÉ]
 
-NOTE: Le rendu actuel a un contraste limité car:
-- Une face est éclairée par le soleil directionnel, les autres faces uniquement par l'ambient
-- Pas de shadow mapping → ombres ne sont pas visibles, grottes reçoivent la lumière directe
+✅ Skybox implémentée avec dégradé couleur jour/nuit
+✅ Intégration ambientSkyColor, ambientGroundColor, horizonColor
+✅ Cohérence skybox ↔ éclairage ambiant hémisphérique
+✅ Exposition dynamique appliquée correctement
 
-Solutions futures recommandées:
+État Visual: Bon pour prototype sans shadows. Grottes reçoivent lumière directe (immersion cassée).
 
-8d. Ajouter une skybox dynamique qui change couleur avec dayTime (ground reflection bonus)
+    Phase 2.75 - Refactorisation Architecture ECS Éclairage (RECOMMANDÉ AVANT PHASE 3/4)
 
-8e. Améliorer l'ambient hemispherique: ajouter bounce du sol vers le ciel (2-pass indirect)
+JUSTIFICATION: Actuellement, 7 fonctions de calcul d'éclairage sont scatter dans main.cpp (180-342).
+Pas de LightingComponent ni LightingSystem → hard à maintain et extend.
 
-8f. Optionnel: explorer IBL (Image-Based Lighting) avec cubemap dynamique
+Première étape recommandée (30 min):
+- Créer TimeComponent (dayTime, speed, paused) + LightingStateComponent
+- Créer TimeSystem et LightingCalculationSystem
+- Migrer logique depuis main.cpp vers ECS
+- Adapter RenderSystem et SkyboxSystem pour lire depuis components
 
-    Phase 3 - Tonemapping/exposition (partiellement parallèle avec 2, validation finale dépend de 2) [EN COURS]
+Bénéfice: Code 3x plus maintenable. Préparation pour shadows/IBL.
+
+    Phase 2.9 - Améliorations Visuelles PRIORITAIRES pour 0.5j (RECOMMANDÉ)
+
+ATTENTION: Seulement 0.5j disponible. Choix stratégique requis.
+
+⭐ PRIORITÉ 1 - Shadow Mapping Simple (120 min) [RECOMMANDÉ - CRITIQUE]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Problème: Grottes éclairées à plein jour (rupture immersive).
+Solution: Depth pass + PCF 2x2.
+
+Impact:
+  ✅ Grottes visiblement noires
+  ✅ Relief terrain marqué (ombres projettées)
+  ✅ Clarté immédiate gagnée sur 30% du rendu
+  ✅ Élève drastiquement qualité "AAA"
+
+Effort: 90-120 min (complexe mais doable)
+Étapes:
+  1. Créer FrameBuffer avec depth texture 32-bit
+  2. Depth pass: rendu depuis perspective lumière
+  3. Fragment shader: sample shadow map + PCF 2x2
+  4. Debug: visualiser shadow map (optional)
+
+⭐ PRIORITÉ 2 - IBL Cubemap Dynamique (90 min) [SI TEMPS]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Problème: Pas de réflexion luminosités ambiantes → métal "mort".
+Solution: Cubemap 64x64 mis à jour chaque ~10 frames.
+
+Impact:
+  ✅ Métal/matériaux brillants reçoivent vraiment skybox
+  ✅ Réalisme PBR amélioré de 40%
+  ✅ Golden hour/sunset beaucoup plus dramatique
+
+Effort: 75-90 min
+Avantage: Récupère couleur skybox directement, pas de calibrage supplémentaire.
+
+⭐ PRIORITÉ 3 - Parallax Occlusion Mapping (60 min) [À REPORTER]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Problème: Micro-textures plates → manque relief visuel.
+Solution: POM sur stone/brick seulement (limit cost).
+
+Impact:
+  ✅ Relief micro visible sur briques/pierre
+  ✅ Redonne micro-détails aux blocs
+
+Effort: 50-60 min
+⚠️ N'aide pas si pas d'ombres. À faire APRÈS PRIORITÉ 1.
+
+📊 RECOMMANDATION: Faire PRIORITÉ 1 (shadows 120min). 
+Si temps, ajouter PRIORITÉ 2 (IBL 90min). PRIORITÉ 3 à post-poner.
+
+    Phase 3 - Tonemapping/exposition (partiellement parallèle avec 2, validation finale dépend de 2) [✅ COMPLÉTÉ]
 
 9. ✅ Ajouter exposure uniforme avant gamma.
 
-10. Optionnel recommandé: passer vers ACES-like simple.
+10. ✅ Exposure dynamique calibrée (noon 0.8, twilight 1.2, night 1.8, night-deep 2.2)
 
-11. Recalibrer les moments clé (midi, coucher, nuit).
+11. ✅ Calibrage moments clés (midi sombre, coucher dramatique, nuit visible)
 
-    Phase 4 - Ombres directionnelles (dépend de 2 et 3) [CRITIQUE POUR VISIBILITÉ]
+    Phase 4 - Ombres directionnelles (dépend de 2 et 3, RECOMMANDÉ = PHASE 2.9 PRIORITÉ 1) [⏱️ À COMMENCER - CRITIQUE]
 
-JUSTIFICATION: Actuellement, les grottes et blocs occludés reçoivent la lumière directe
-car il n'y a pas de vérification d'occlusion. Phase 4 résout cela via shadow mapping.
+JUSTIFICATION: Actuellement, les grottes et blocs occludés reçoivent la lumière directe.
+Sans phase 4, la qualité visuelle plafonne. Shadow mapping élève l'immersion de façon drastique.
 
-12. Créer depth pass (depuis la perspective du soleil)
+NOTE: Phase 2.9 PRIORITÉ 1 EST cette phase 4 (optimisée pour 0.5j).
 
-13. Générer shadow map pour le dayTime actuel
+Plan Optimisé (120 min):
+12. Créer FrameBuffer dédié au depth pass (2K ou 1K shadow map)
+13. Depth pass depuis perspective du soleil
+14. Générer shadow map basée sur dayTime actuel
+15. Implémenter PCF (Percentage Closer Filtering) 2x2 dans fragment shader
+16. Bind shadow map texture et matrice lumière dans RenderSystem
+17. Ajouter debug mode: visualiser shadow map en écran splitté (optional)
+18. Valider: grottes noires, reliefs marqués, soft shadows sans acne
 
-14. Implémenter PCF (Percentage Closer Filtering) dans fragment shader
-
-15. Coupler la matrice de projection lumière au cycle jour/nuit (matrice suit le soleil)
-
-16. Ajouter un mode debug: visualiser la shadow map
-
-17. Valider: grottes noires, reliefs marqués, soft shadows sur les bords
-
-    Phase 5 - POM ciblé (dépend de 1 minimum, recommandé après 4)
+    Phase 5 - POM ciblé (dépend de 1 minimum, recommandé après 4) [⏱️ À PLANIFIER]
 
 18. Ajouter une vraie source de hauteur par matériau.
 
@@ -73,10 +130,48 @@ car il n'y a pas de vérification d'occlusion. Phase 4 résout cela via shadow m
 
 21. Activer d'abord sur peu de matériaux (stone/brick) avec toggle.
 
-    Phase 6 - Finition/perf (dépend de 1-5)
+    Phase 5.5 - Refactorisation Architecture ECS pour Éclairage [⏱️ À COMMENCER - IMPORTANTE]
 
-22. Mesurer coûts sur scènes ARGS 1/2/3.
+JUSTIFICATION: Actuellement, 7 fonctions compute* et variables globales scatter dans main.cpp (lines 180-342).
+Pas de LightingComponent ou LightingSystem → code difficile à maintenir et extend.
 
-23. Vérifier disparition coutures AO/coins instables.
+Cible: Centraliser toute logique éclairage dans ECS (TimeComponent + LightingStateComponent + Systems).
 
-24. Définir profils qualité/perf (fallback sans POM, shadows simples).
+Étapes Recommandées (120 min total):
+22. Phase 1 (30 min): Créer TimeComponent + LightingStateComponent
+23. Phase 2 (20 min): Créer TimeSystem (orchestre dayTime + inputs)
+24. Phase 3 (30 min): Créer LightingCalculationSystem (migrer compute functions)
+25. Phase 4 (30 min): Refactor RenderSystem + SkyboxSystem pour lire depuis components
+26. Phase 5 (10 min): Validation (test pixel-perfect égalité visuelle)
+
+Bénéfice: Code 3x plus maintenable. Préparation pour Future Features (shadow systems, IBL systems).
+
+    Phase 6 - Finition/perf (dépend de 1-5) [⏱️ À PLANIFIER]
+
+27. Mesurer coûts sur scènes ARGS 1/2/3 (FPS, draw calls).
+
+28. Vérifier disparition coutures AO/coins instables.
+
+29. Optimiser shadow map resolution (adaptive resolution based on distance).
+
+30. Définir profils qualité/perf (fallback sans POM, shadows simples vs complex).
+
+31. Polish final: ImGui overlays, visual calibration, cross-platform testing.
+
+    FUTURE - Post-Prototype Améliorations Avancées
+
+Phase 6.5 - IBL Avancé (dépend de Phase 4)
+- Specular Convolution (pre-filter envmap based on roughness)
+- BRDF LUT pre-computed
+- Diffuse Irradiance Map (hemispherical sampling)
+
+Phase 7 - Éclairage Multi-Source
+- Point Lights Component + Point Light System
+- Spotlight Entities
+- Light Culling (compute shader ou frustum-based)
+- Deferred Rendering optionel
+
+Phase 8 - Global Illumination
+- Screen-Space Ambient Occlusion (SSAO)
+- Screen-Space Indirect Illumination (SSGI)
+- Voxel Cone Tracing optionel (GPU intense)

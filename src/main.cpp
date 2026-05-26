@@ -44,6 +44,8 @@ using namespace glm;
 #include "ecs/components/camera.hpp"
 #include "ecs/components/inputReceiver.hpp"
 #include "ecs/components/skyboxComponent.hpp"
+#include "ecs/components/timeComponent.hpp"
+#include "ecs/components/lightingStateComponent.hpp"
 #include "ecs/systems/chunkMeshingSystem.hpp"
 #include "ecs/systems/renderSystem.hpp"
 #include "ecs/systems/inputSystem.hpp"
@@ -52,6 +54,8 @@ using namespace glm;
 #include "ecs/systems/debugSystem.hpp"
 #include "ecs/systems/debugInputSystem.hpp"
 #include "ecs/systems/skyboxSystem.hpp"
+#include "ecs/systems/timeSystem.hpp"
+#include "ecs/systems/lightingCalculationSystem.hpp"
 #include "ecs/systems/PathFindingSystem.hpp"
 #include "ecs/systems/TerrainSystem.hpp"
 
@@ -342,25 +346,69 @@ static float computeExposureFromTime(float t) {
 }
 
 
-static RenderDebugState getRenderDebugState() {
+static void syncComponentsToGlobals(Registry& registry) {
+    // Synchronize TimeComponent to globals
+    auto timeView = registry.view<TimeComponent>();
+    if (!timeView.isEmpty()) {
+        EntityID timeEntity = *timeView.begin();
+        TimeComponent& timeComp = registry.getComponent<TimeComponent>(timeEntity);
+        dayTime = timeComp.dayTime;
+        daySpeed = timeComp.daySpeed;
+        dayPaused = timeComp.paused;
+        useReducedAmbient = (timeComp.ambientPreset == TimeComponent::AmbientPreset::CRISP);
+    }
+    
+    // Synchronize LightingStateComponent to globals
+    auto lightingView = registry.view<LightingStateComponent>();
+    if (!lightingView.isEmpty()) {
+        EntityID lightingEntity = *lightingView.begin();
+        LightingStateComponent& lightingComp = registry.getComponent<LightingStateComponent>(lightingEntity);
+        debugTBN = lightingComp.debugTBN;
+        useNormalMap = lightingComp.useNormalMap;
+        debugDiffuseOnly = lightingComp.debugDiffuseOnly;
+        useBakedAO = lightingComp.useBakedAO;
+        useHemisphericalAmbient = lightingComp.useHemisphericalAmbient;
+        useReducedAmbient = lightingComp.useReducedAmbient;
+        aoStrength = lightingComp.aoStrength;
+    }
+}
+
+
+static RenderDebugState getRenderDebugState(Registry& registry) {
+    // Read from ECS components if available
+    auto lightingView = registry.view<LightingStateComponent>();
+    auto timeView = registry.view<TimeComponent>();
+    
+    LightingStateComponent lightingState;
+    TimeComponent timeState;
+    
+    if (!lightingView.isEmpty()) {
+        EntityID lightingEntity = *lightingView.begin();
+        lightingState = registry.getComponent<LightingStateComponent>(lightingEntity);
+    }
+    if (!timeView.isEmpty()) {
+        EntityID timeEntity = *timeView.begin();
+        timeState = registry.getComponent<TimeComponent>(timeEntity);
+    }
+    
     return RenderDebugState{
         .usePbrShader = usePbrShader,
-        .debugTBN = debugTBN,
-        .useNormalMap = useNormalMap,
-        .debugDiffuseOnly = debugDiffuseOnly,
-        .useBakedAO = useBakedAO,
-        .useHemisphericalAmbient = useHemisphericalAmbient,
-        .useReducedAmbient = useReducedAmbient,
-        .ambientStrength = computeAmbientStrengthFromTime(dayTime),
-        .aoStrength = aoStrength,
-        .exposure = computeExposureFromTime(dayTime),
-        .lightColor = computeLightColorFromTime(dayTime),
-        .ambientSkyColor = computeAmbientSkyColorFromTime(dayTime),
-        .ambientGroundColor = computeAmbientGroundColorFromTime(dayTime),
-        .horizonColor = computeHorizonColorFromTime(dayTime),
-        .dayTime = dayTime,
-        .daySpeed = daySpeed,
-        .dayPaused = dayPaused
+        .debugTBN = lightingState.debugTBN,
+        .useNormalMap = lightingState.useNormalMap,
+        .debugDiffuseOnly = lightingState.debugDiffuseOnly,
+        .useBakedAO = lightingState.useBakedAO,
+        .useHemisphericalAmbient = lightingState.useHemisphericalAmbient,
+        .useReducedAmbient = lightingState.useReducedAmbient,
+        .ambientStrength = lightingState.ambientStrength,
+        .aoStrength = lightingState.aoStrength,
+        .exposure = lightingState.exposure,
+        .lightColor = lightingState.lightColor,
+        .ambientSkyColor = lightingState.ambientSkyColor,
+        .ambientGroundColor = lightingState.ambientGroundColor,
+        .horizonColor = lightingState.horizonColor,
+        .dayTime = timeState.dayTime,
+        .daySpeed = timeState.daySpeed,
+        .dayPaused = timeState.paused
     };
 }
 
@@ -512,6 +560,8 @@ int main(int argc, char** argv) {
     DebugSystem debugSystem;
     DebugInputSystem debugInputSystem;
     SkyboxSystem skyboxSystem;
+    TimeSystem timeSystem;
+    LightingCalculationSystem lightingSystem;
     
     // Systèmes du dev bonus
     TerrainConfig config = LoadConfig("config.txt");
@@ -549,6 +599,27 @@ int main(int argc, char** argv) {
         glm::vec3(0, 0, 0)
     });
     skyboxSystem.initializeSkyboxGeometry(registry, skyboxEntity);
+
+    // Create TimeManager entity
+    EntityID timeManagerEntity = registry.createEntity();
+    TimeComponent timeComp;
+    timeComp.dayTime = dayTime;
+    timeComp.daySpeed = daySpeed;
+    timeComp.paused = dayPaused;
+    timeComp.ambientPreset = useReducedAmbient ? TimeComponent::AmbientPreset::CRISP : TimeComponent::AmbientPreset::SOFT;
+    registry.addComponent(timeManagerEntity, timeComp);
+
+    // Create LightingManager entity
+    EntityID lightingManagerEntity = registry.createEntity();
+    LightingStateComponent lightingComp;
+    lightingComp.useHemisphericalAmbient = useHemisphericalAmbient;
+    lightingComp.useBakedAO = useBakedAO;
+    lightingComp.useReducedAmbient = useReducedAmbient;
+    lightingComp.aoStrength = aoStrength;
+    lightingComp.debugTBN = debugTBN;
+    lightingComp.useNormalMap = useNormalMap;
+    lightingComp.debugDiffuseOnly = debugDiffuseOnly;
+    registry.addComponent(lightingManagerEntity, lightingComp);
 
     if (selectedScene == TestSceneMode::SimpleSubChunk) {
         TestScenes::createSimpleChunk(registry);
@@ -623,7 +694,7 @@ int main(int argc, char** argv) {
                 }
                 
                 // Handle debug inputs (day/night cycle, render toggles)
-                debugInputSystem.update(window, deltaTime);
+                debugInputSystem.update(registry, window, deltaTime);
 
                 int displayW, displayH;
                 glfwGetFramebufferSize(window, &displayW, &displayH);
@@ -667,14 +738,16 @@ int main(int argc, char** argv) {
                 pathFindingSystem.update(registry);
                 
                 // Handle debug inputs (day/night cycle, render toggles)
-                debugInputSystem.update(window, deltaTime);
+                debugInputSystem.update(registry, window, deltaTime);
 
-                if (!dayPaused) {
-                    dayTime = std::fmod(dayTime + daySpeed * deltaTime, 1.0f);
-                    if (dayTime < 0.0f) {
-                        dayTime += 1.0f;
-                    }
-                }
+                // Update time system (day/night cycle)
+                timeSystem.update(registry, deltaTime);
+                
+                // Calculate lighting state from time
+                lightingSystem.update(registry);
+                
+                // Sync components to globals for backward compatibility
+                syncComponentsToGlobals(registry);
 
                 GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
                 BlockTextureManager::bindArrays(activeProgramID);
@@ -682,11 +755,11 @@ int main(int argc, char** argv) {
                 glUseProgram(activeProgramID);
                 applyActiveShaderUniforms(activeProgramID);
 
-                // On dessine d'abord le terrain
+                // Render terrain
                 renderSystem.update(registry, activeProgramID, computeLightColorFromTime(dayTime), computeLightDirectionFromTime(dayTime));
                 
-                // On dessine la skybox après pour profiter du Early-Z culling
-                skyboxSystem.update(registry, getRenderDebugState());
+                // Render skybox
+                skyboxSystem.update(registry, getRenderDebugState(registry));
                 
                 if (debugWireframe) {
                     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -695,7 +768,7 @@ int main(int argc, char** argv) {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
                 ImGui_ImplOpenGL3_NewFrame();
-                debugSystem.update(registry, window, deltaTime, getRenderDebugState());
+                debugSystem.update(registry, window, deltaTime, getRenderDebugState(registry));
                 
                 glDisable(GL_DEPTH_TEST);
                 ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -709,15 +782,16 @@ int main(int argc, char** argv) {
             }
 
             // Handle debug inputs (day/night cycle, render toggles, AO adjustments)
-            debugInputSystem.update(window, deltaTime);
+            debugInputSystem.update(registry, window, deltaTime);
 
-            // Update day/night cycle
-            if (!dayPaused) {
-                dayTime = std::fmod(dayTime + daySpeed * deltaTime, 1.0f);
-                if (dayTime < 0.0f) {
-                    dayTime += 1.0f;
-                }
-            }
+            // Update time system (day/night cycle)
+            timeSystem.update(registry, deltaTime);
+            
+            // Calculate lighting state from time
+            lightingSystem.update(registry);
+            
+            // Sync components to globals for backward compatibility
+            syncComponentsToGlobals(registry);
 
             GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
             BlockTextureManager::bindArrays(activeProgramID);
@@ -725,11 +799,11 @@ int main(int argc, char** argv) {
             glUseProgram(activeProgramID);
             applyActiveShaderUniforms(activeProgramID);
 
-            // On dessine d'abord le terrain
+            // Render terrain
             renderSystem.update(registry, activeProgramID, computeLightColorFromTime(dayTime), computeLightDirectionFromTime(dayTime));
 
-            // On dessine la skybox après
-            skyboxSystem.update(registry, getRenderDebugState());
+            // Render skybox
+            skyboxSystem.update(registry, getRenderDebugState(registry));
             
             if (debugWireframe) {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -738,7 +812,7 @@ int main(int argc, char** argv) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
             ImGui_ImplOpenGL3_NewFrame();
-            debugSystem.update(registry, window, deltaTime, getRenderDebugState());
+            debugSystem.update(registry, window, deltaTime, getRenderDebugState(registry));
             
             glDisable(GL_DEPTH_TEST);
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
