@@ -6,6 +6,8 @@
 #include "ecs/components/chunk.hpp"
 #include "ecs/components/lightingStateComponent.hpp"
 #include "engine/render/shader.hpp"
+#include "ecs/components/player.hpp"
+#include "ecs/components/monster.hpp"
 
 #include <glm/glm.hpp>
 #include <array>

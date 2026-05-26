@@ -23,6 +23,7 @@ struct InputReceiverComponent : public Component {
     bool toggleAmbient = false;
     
     bool toggleCameraSwap = false;
+    bool toggleMonsterSpawn = false;
 
     double mouseX = 0.;
     double mouseY = 0.;

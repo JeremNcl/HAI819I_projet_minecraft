@@ -64,6 +64,8 @@ using namespace glm;
 #include "ecs/systems/collisionSystem.hpp"
 #include "ecs/systems/deltaTimeSystem.hpp"
 #include "ecs/systems/playerInteractionSystem.hpp"
+#include "ecs/systems/monsterInteractionSystem.hpp"
+#include "ecs/systems/monsterMovementSystem.hpp"
 
 //void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -419,6 +421,8 @@ int main(int argc, char** argv) {
     PhysicsSystem physicsSystem;
     CollisionSystem collisionSystem;
     PlayerInteractionSystem interactionSystem;
+    MonsterInteractionSystem monsterInteractionSystem;
+    MonsterMovementSystem monsterMovementSystem;
 
     // Systèmes terrain et pathfinding
     TerrainConfig config = LoadConfig("config.txt");
@@ -582,24 +586,14 @@ int main(int argc, char** argv) {
                 if (windowSystem.update(registry, window)) {
                     inputSystem.resetMouseTracking(window);
                 }
-                    
+
+                pathFindingSystem.update(registry);
+                monsterInteractionSystem.update(registry, deltaTime);
                 movementSystem.update(registry, deltaTime);
+                monsterMovementSystem.update(registry, deltaTime);
                 physicsSystem.update(registry, deltaTime);
                 collisionSystem.update(registry, deltaTime);
                 interactionSystem.update(registry, terrainSystem);
-
-                pathFindingSystem.update(registry);
-                
-                // Handle debug inputs (day/night cycle, render toggles)
-                debugInputSystem.update(registry, window, deltaTime);
-
-                // Systèmes physiques et interactions (main)
-                movementSystem.update(registry, deltaTime);
-                physicsSystem.update(registry, deltaTime);
-                collisionSystem.update(registry, deltaTime);
-                interactionSystem.update(registry, terrainSystem);
-                cameraSystem.update(registry, deltaTime); // (Seulement dans le else, comme dans leur code)
-                pathFindingSystem.update(registry);
                 
                 // Handle debug inputs (day/night cycle, render toggles)
                 debugInputSystem.update(registry, window, deltaTime);
@@ -646,14 +640,15 @@ int main(int argc, char** argv) {
                 inputSystem.resetMouseTracking(window);
             }   
 
-            // Systèmes physiques et interactions (main)
+            pathFindingSystem.update(registry);
+            monsterInteractionSystem.update(registry, deltaTime);
             movementSystem.update(registry, deltaTime);
+            monsterMovementSystem.update(registry, deltaTime);
             physicsSystem.update(registry, deltaTime);
             collisionSystem.update(registry, deltaTime);
             interactionSystem.update(registry, terrainSystem);
             cameraSystem.update(registry, deltaTime); // (Seulement dans le else, comme dans leur code)
-            pathFindingSystem.update(registry);
-            
+
             // Handle debug inputs (day/night cycle, render toggles)
             debugInputSystem.update(registry, window, deltaTime);
 
