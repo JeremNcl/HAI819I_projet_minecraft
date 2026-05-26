@@ -144,7 +144,7 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
 
             if (isAwayFromEdge) {
                 if ((std::rand() % 1000) < m_config.treeChance) {
-                    treesToGenerate.push_back(glm::ivec3(x, surfaceY + 1, z));
+                    treesToGenerate.push_back(glm::ivec3(x, surfaceY, z));
                 }
             }
         }
