@@ -31,6 +31,8 @@ void DebugSystem::update(Registry& _registry, GLFWwindow* _window, float _deltaT
             m_debugWireframe = !m_debugWireframe;
             std::cout << "Mode Wireframe: " << (m_debugWireframe ? "ON" : "OFF") << std::endl;
         }
+
+        break; // FAUT Faire en sorte d'avoir des inputs unique (peut importe si y'a plusieur entity ayant des components InputReceiver)
     }
 
     
