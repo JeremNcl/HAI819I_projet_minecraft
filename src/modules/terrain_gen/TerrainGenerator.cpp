@@ -75,6 +75,10 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
     FastNoiseLite terrainNoise;
     terrainNoise.SetSeed(m_seed);
     terrainNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    terrainNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    terrainNoise.SetFractalOctaves(4);
+    terrainNoise.SetFractalLacunarity(2.0f);
+    terrainNoise.SetFractalGain(0.5f);
 
     FastNoiseLite caveNoise;
     caveNoise.SetSeed(m_seed);
@@ -113,9 +117,11 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
                                     pW * m_config.heightPlains + 
                                     mW * m_config.heightMountain);
 
-            int terrainHeight = localHeight + static_cast<int>(noiseValue * m_config.amplitude);
-            terrainHeight = std::max(0, std::min(terrainHeight, CHUNK_HEIGHT - 1));
+            float dynamicAmplitude = (dW * 8.0f) + (pW * 5.0f) + (mW * 45.0f);
+            float sculpt = noiseValue * noiseValue * noiseValue; 
 
+            int terrainHeight = localHeight + static_cast<int>(sculpt * dynamicAmplitude);
+            terrainHeight = std::max(0, std::min(terrainHeight, CHUNK_HEIGHT - 1));
             for (int y = 0; y < CHUNK_HEIGHT; ++y) {
                 int index = GetIndex(x, y, z);
                 
