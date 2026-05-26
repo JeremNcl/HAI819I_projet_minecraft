@@ -10,26 +10,32 @@ void DebugSystem::update(Registry& _registry, GLFWwindow* _window, float _deltaT
         if (input.togglePbr) {
             m_usePbrShader = !m_usePbrShader;
             std::cout << "Mode rendu: " << (m_usePbrShader ? "PBR" : "BASIC") << std::endl;
+            input.togglePbr = false;
         }
         if (m_usePbrShader && input.toggleTBN) {
             m_debugTBN = !m_debugTBN;
             std::cout << "Debug TBN: " << (m_debugTBN ? "ON" : "OFF") << std::endl;
+            input.toggleTBN = false;
         }
         if (m_usePbrShader && input.toggleNormalMap) {
             m_useNormalMap = !m_useNormalMap;
             std::cout << "Normal map: " << (m_useNormalMap ? "ON" : "OFF") << std::endl;
+            input.toggleNormalMap = false;
         }
         if (m_usePbrShader && input.toggleDiffuse) {
             m_debugDiffuseOnly = !m_debugDiffuseOnly;
             std::cout << "Diffuse only: " << (m_debugDiffuseOnly ? "ON" : "OFF") << std::endl;
+            input.toggleDiffuse = false;
         }
         if (input.toggleAmbient) {
             m_useReducedAmbient = !m_useReducedAmbient;
             std::cout << "Ambient preset: " << (m_useReducedAmbient ? "CRISP" : "SOFT") << std::endl;
+            input.toggleAmbient = false;
         }
         if (input.toggleWireframe) {
             m_debugWireframe = !m_debugWireframe;
             std::cout << "Mode Wireframe: " << (m_debugWireframe ? "ON" : "OFF") << std::endl;
+            input.toggleWireframe = false;
         }
 
         break; // FAUT Faire en sorte d'avoir des inputs unique (peut importe si y'a plusieur entity ayant des components InputReceiver)
