@@ -3,7 +3,7 @@
 #define DEBUGINPUTSYSTEM_HPP
 
 #include <GLFW/glfw3.h>
-#include "../../ecs/registry.hpp"
+#include "ecs/registry.hpp"
 
 // Global debug variables (controlled by this system)
 extern float dayTime;
@@ -16,11 +16,13 @@ extern bool debugDiffuseOnly;
 extern bool useBakedAO;
 extern bool useHemisphericalAmbient;
 extern bool useReducedAmbient;
+extern bool debugWireframe;
 
 class DebugInputSystem {
     private:
-        // Key press tracking for one-time toggles (render settings)
-        // These use prev_* to detect rising edges (press once)
+        // Key press tracking for one-time toggles
+        bool prev_F1 = false;
+        bool prev_F3 = false;
         bool prev_F4 = false;
         bool prev_F5 = false;
         bool prev_F6 = false;
@@ -38,29 +40,23 @@ class DebugInputSystem {
         bool prev_LEFT = false;
         bool prev_RIGHT = false;
 
-        // Repeat timers for held arrow keys (slow continuous adjustments)
+        // Repeat timers for held arrow keys
         float arrow_repeat_timer_UP = 0.0f;
         float arrow_repeat_timer_DOWN = 0.0f;
         float arrow_repeat_timer_LEFT = 0.0f;
         float arrow_repeat_timer_RIGHT = 0.0f;
-        static constexpr float REPEAT_DELAY = 0.2f;  // Initial delay before repeat starts
-        static constexpr float REPEAT_INTERVAL = 0.08f;  // Interval between repeats
-        static constexpr float INCREMENT_STEP = 0.02f;  // Amount to increment per press
+        static constexpr float REPEAT_DELAY = 0.2f;
+        static constexpr float REPEAT_INTERVAL = 0.08f;
+        static constexpr float INCREMENT_STEP = 0.02f;
 
-        // Helper: Check if key is currently held
         bool checkKeyHeld(GLFWwindow* window, int key);
-
-        // Helper: Check if key pressed exactly once (for toggles)
         bool keyPressedOnce(GLFWwindow* window, int key, bool& prev);
-
-        // Helper: Check if arrow key triggered (initial press + debounced repeat)
         bool checkArrowWithDebounce(GLFWwindow* window, int key, bool& prevState, 
                                    float& repeatTimer, float deltaTime);
 
     public:
         DebugInputSystem() = default;
 
-        // Update all debug inputs (needs registry for TimeComponent, LightingStateComponent)
         void update(Registry& registry, GLFWwindow* window, float deltaTime);
 };
 

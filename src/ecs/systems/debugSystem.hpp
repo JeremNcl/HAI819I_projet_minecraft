@@ -33,30 +33,26 @@ struct RenderDebugState {
     bool dayPaused = false;
 };
 
-// Global AO strength controlled by UI
 extern float aoStrength;
-// Globals controlled by UI/keys
 extern float dayTime;
 extern float daySpeed;
 extern bool dayPaused;
+extern bool debugWireframe;
 
 class DebugSystem {
     private:
-        // Stats averaging
         float statsUpdateTimer = 0.0f;
-        static constexpr float STATS_UPDATE_INTERVAL = 0.5f;  // Update stats every 0.5 seconds
+        static constexpr float STATS_UPDATE_INTERVAL = 0.5f;
         float lastDisplayedFps = 60.0f;
         float lastDisplayedDeltaTime = 0.016f;
         int frameCount = 0;
         float frameTimeAccum = 0.0f;
 
-        bool m_debugWireframe = false;
-
     public:
         void update(Registry& _registry, GLFWwindow* _window, float _deltaTime, const RenderDebugState& renderState);
         void renderLoadingScreen(GLFWwindow* _window, int _currentMeshesReady, int _totalExpectedMeshes);
 
-        bool isWireframe() const { return m_debugWireframe; }
+        bool isWireframe() const { return debugWireframe; }
 };
 
 #endif

@@ -43,22 +43,15 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
     bool leftClick = mousePressedOnce(_window, GLFW_MOUSE_BUTTON_LEFT);
     bool rightClick = mousePressedOnce(_window, GLFW_MOUSE_BUTTON_RIGHT);
 
+    // Commandes globales de la fenêtre moteur
     bool toggleFullscreen = keyPressedOnce(_window, GLFW_KEY_F11);
-    bool toggleWireframe = keyPressedOnce(_window, GLFW_KEY_F5);
-    bool togglePbr = keyPressedOnce(_window, GLFW_KEY_F10);
-    bool toggleTBN = keyPressedOnce(_window, GLFW_KEY_F9);
-    bool toggleNormalMap = keyPressedOnce(_window, GLFW_KEY_F8);
-    bool toggleDiffuse = keyPressedOnce(_window, GLFW_KEY_F7);
-    bool toggleAmbient = keyPressedOnce(_window, GLFW_KEY_F6);
-
-    bool toggleCameraSwap = keyPressedOnce(_window, GLFW_KEY_F2);
-
     bool f11Pressed = (glfwGetKey(_window, GLFW_KEY_F11) == GLFW_PRESS);
 
     for (EntityID entity : view) {
         
         InputReceiverComponent& input = _registry.getComponent<InputReceiverComponent>(entity);
         
+        // Inputs de Gameplay pur
         input.moveForward = (glfwGetKey(_window, GLFW_KEY_W) == GLFW_PRESS);
         input.moveBackward = (glfwGetKey(_window, GLFW_KEY_S) == GLFW_PRESS);
         input.moveLeft = (glfwGetKey(_window, GLFW_KEY_A) == GLFW_PRESS);
@@ -70,13 +63,6 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         input.rightClick = rightClick;
 
         input.toggleFullscreen = toggleFullscreen;
-        input.toggleWireframe = toggleWireframe;
-        input.togglePbr = togglePbr;
-        input.toggleTBN = toggleTBN;
-        input.toggleNormalMap = toggleNormalMap;
-        input.toggleDiffuse = toggleDiffuse;
-        input.toggleAmbient = toggleAmbient;
-        input.toggleCameraSwap = toggleCameraSwap;
 
         input.mouseX = deltaX;
         input.mouseY = deltaY;
