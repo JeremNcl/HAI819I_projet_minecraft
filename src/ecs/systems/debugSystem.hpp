@@ -6,6 +6,7 @@
 #include "ecs/components/camera.hpp"
 #include "ecs/components/transform.hpp"
 #include "ecs/components/inputReceiver.hpp"
+#include "ecs/components/inventory.hpp"
 
 #include <glm/glm.hpp>
 #include <imgui.h>
@@ -51,7 +52,7 @@ class DebugSystem {
     public:
         void update(Registry& _registry, GLFWwindow* _window, float _deltaTime, const RenderDebugState& renderState);
         void renderLoadingScreen(GLFWwindow* _window, int _currentMeshesReady, int _totalExpectedMeshes);
-
+        void renderInventoryUI(Registry& registry, EntityID playerID, GLFWwindow* window);
         bool isWireframe() const { return debugWireframe; }
 };
 

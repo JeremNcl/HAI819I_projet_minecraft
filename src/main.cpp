@@ -27,6 +27,7 @@ using namespace glm;
 // ImGui
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_impl_glfw.h"
 
 // Inclusions de notre moteur (Nouvelle architecture ECS)
 #include "engine/render/shader.hpp"
@@ -38,6 +39,7 @@ using namespace glm;
 
 // ECS Includes
 #include "ecs/registry.hpp"
+#include "ecs/components/inventory.hpp"
 #include "ecs/components/transform.hpp"
 #include "ecs/components/mesh.hpp"
 #include "ecs/components/chunk.hpp"
@@ -65,7 +67,6 @@ using namespace glm;
 #include "ecs/systems/deltaTimeSystem.hpp"
 #include "ecs/systems/playerInteractionSystem.hpp"
 
-//void processInput(GLFWwindow *window, Camera& camera);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void MeshingWorkerThread(Registry& registry, TerrainSystem& terrain, ChunkMeshingSystem& meshing);
 
@@ -81,11 +82,10 @@ float aoStrength = 0.50f;
 bool useReducedAmbient = false;
 
 // Day / Night cycle (managed by DebugInputSystem)
-float dayTime = 0.0f;      // normalized [0,1]
-float daySpeed = 0.02f;    // units per second (fraction of day per second)
+float dayTime = 0.0f;      
+float daySpeed = 0.02f;    
 bool dayPaused = false;
 
-// Ambient presets: SOFT gives higher ambient to reduce overall contrast
 static constexpr float kAmbientSoft = 0.055f;
 static constexpr float kAmbientCrisp = 0.035f;
 
@@ -114,22 +114,6 @@ static TestSceneMode parseSceneMode(int argc, char** argv) {
     return TestSceneMode::InfiniteTerrain;
 }
 
-static void positionCameraForScene(Registry& registry, EntityID cameraEntity, TestSceneMode sceneMode) {
-    auto& transform = registry.getComponent<TransformComponent>(cameraEntity);
-
-    switch (sceneMode) {
-        case TestSceneMode::SimpleSubChunk:
-            transform.position = glm::vec3(8.0f, 24.0f, -24.0f);
-            break;
-        case TestSceneMode::GeneratedChunk:
-            transform.position = glm::vec3(8.0f, 40.0f, -32.0f);
-            break;
-        case TestSceneMode::InfiniteTerrain:
-            transform.position = glm::vec3(45.0f, 120.0f, -55.0f);
-            break;
-    }
-}
-
 static void buildStaticSceneMeshes(Registry& registry, ChunkMeshingSystem& meshingSystem) {
     std::vector<EntityID> subChunkEntities;
     subChunkCache cache;
@@ -155,27 +139,16 @@ static void buildStaticSceneMeshes(Registry& registry, ChunkMeshingSystem& meshi
     }
 }
 
-
-// Derive day/night cycle parameters from normalized dayTime [0, 1]
-// dayTime: 0.0 = sunrise, 0.25 = noon, 0.5 = sunset, 0.75 = night, 1.0 = end of day
-
-static float inverseLerp(float a, float b, float v) {
-    return glm::clamp((v - a) / (b - a), 0.0f, 1.0f);
-}
-
-// Fonction utilitaire pour synchroniser parfaitement l'angle physique du soleil avec les couleurs de la skybox
 static float getSunAngle(float t) {
-    float sunrise = 0.20f; // Heure exacte du lever
-    float sunset = 0.80f;  // Heure exacte du coucher
+    float sunrise = 0.20f; 
+    float sunset = 0.80f;  
     float dayDuration = sunset - sunrise;
     float nightDuration = 1.0f - dayDuration;
 
     if (t >= sunrise && t <= sunset) {
-        // Le jour, l'angle va de 0 à PI
         float t_mapped = (t - sunrise) / dayDuration;
         return t_mapped * glm::pi<float>();
     } else {
-        // La nuit, l'angle va de PI à 2*PI
         float t_mapped;
         if (t > sunset) t_mapped = (t - sunset) / nightDuration;
         else t_mapped = (t + 1.0f - sunset) / nightDuration;
@@ -193,7 +166,6 @@ static LightingStateComponent getLightingState(Registry& registry) {
 }
 
 static void syncComponentsToGlobals(Registry& registry) {
-    // Synchronize TimeComponent to globals
     auto timeView = registry.view<TimeComponent>();
     if (!timeView.isEmpty()) {
         EntityID timeEntity = *timeView.begin();
@@ -204,7 +176,6 @@ static void syncComponentsToGlobals(Registry& registry) {
         useReducedAmbient = (timeComp.ambientPreset == TimeComponent::AmbientPreset::CRISP);
     }
     
-    // Synchronize LightingStateComponent to globals
     LightingStateComponent lightingComp = getLightingState(registry);
     debugTBN = lightingComp.debugTBN;
     useNormalMap = lightingComp.useNormalMap;
@@ -215,9 +186,7 @@ static void syncComponentsToGlobals(Registry& registry) {
     aoStrength = lightingComp.aoStrength;
 }
 
-
 static RenderDebugState getRenderDebugState(Registry& registry) {
-    // Read from ECS components if available
     auto lightingView = registry.view<LightingStateComponent>();
     auto timeView = registry.view<TimeComponent>();
     
@@ -255,57 +224,37 @@ static RenderDebugState getRenderDebugState(Registry& registry) {
 }
 
 static void applyActiveShaderUniforms(GLuint activeProgramID, Registry& registry) {
-    // Get lighting state from ECS
     LightingStateComponent lightingState = getLightingState(registry);
     
     GLint debugLoc = glGetUniformLocation(activeProgramID, "debugTBN");
-    if (debugLoc >= 0) {
-        glUniform1i(debugLoc, lightingState.debugTBN ? 1 : 0);
-    }
+    if (debugLoc >= 0) glUniform1i(debugLoc, lightingState.debugTBN ? 1 : 0);
 
     GLint useNormalMapLoc = glGetUniformLocation(activeProgramID, "useNormalMap");
-    if (useNormalMapLoc >= 0) {
-        glUniform1i(useNormalMapLoc, lightingState.useNormalMap ? 1 : 0);
-    }
+    if (useNormalMapLoc >= 0) glUniform1i(useNormalMapLoc, lightingState.useNormalMap ? 1 : 0);
 
     GLint debugDiffuseOnlyLoc = glGetUniformLocation(activeProgramID, "debugDiffuseOnly");
-    if (debugDiffuseOnlyLoc >= 0) {
-        glUniform1i(debugDiffuseOnlyLoc, lightingState.debugDiffuseOnly ? 1 : 0);
-    }
+    if (debugDiffuseOnlyLoc >= 0) glUniform1i(debugDiffuseOnlyLoc, lightingState.debugDiffuseOnly ? 1 : 0);
 
     GLint hemiAmbientLoc = glGetUniformLocation(activeProgramID, "useHemisphericalAmbient");
-    if (hemiAmbientLoc >= 0) {
-        glUniform1i(hemiAmbientLoc, lightingState.useHemisphericalAmbient ? 1 : 0);
-    }
+    if (hemiAmbientLoc >= 0) glUniform1i(hemiAmbientLoc, lightingState.useHemisphericalAmbient ? 1 : 0);
 
     GLint bakedAOLoc = glGetUniformLocation(activeProgramID, "useBakedAO");
-    if (bakedAOLoc >= 0) {
-        glUniform1i(bakedAOLoc, lightingState.useBakedAO ? 1 : 0);
-    }
+    if (bakedAOLoc >= 0) glUniform1i(bakedAOLoc, lightingState.useBakedAO ? 1 : 0);
+    
     GLint aoStrengthLoc = glGetUniformLocation(activeProgramID, "aoStrength");
-    if (aoStrengthLoc >= 0) {
-        glUniform1f(aoStrengthLoc, lightingState.aoStrength);
-    }
+    if (aoStrengthLoc >= 0) glUniform1f(aoStrengthLoc, lightingState.aoStrength);
 
     GLint ambientStrengthLoc = glGetUniformLocation(activeProgramID, "ambientStrength");
-    if (ambientStrengthLoc >= 0) {
-        glUniform1f(ambientStrengthLoc, lightingState.ambientStrength);
-    }
+    if (ambientStrengthLoc >= 0) glUniform1f(ambientStrengthLoc, lightingState.ambientStrength);
 
     GLint ambientSkyLoc = glGetUniformLocation(activeProgramID, "ambientSkyColor");
-    if (ambientSkyLoc >= 0) {
-        glUniform3fv(ambientSkyLoc, 1, glm::value_ptr(lightingState.ambientSkyColor));
-    }
+    if (ambientSkyLoc >= 0) glUniform3fv(ambientSkyLoc, 1, glm::value_ptr(lightingState.ambientSkyColor));
 
     GLint ambientGroundLoc = glGetUniformLocation(activeProgramID, "ambientGroundColor");
-    if (ambientGroundLoc >= 0) {
-        glUniform3fv(ambientGroundLoc, 1, glm::value_ptr(lightingState.ambientGroundColor));
-    }
+    if (ambientGroundLoc >= 0) glUniform3fv(ambientGroundLoc, 1, glm::value_ptr(lightingState.ambientGroundColor));
 
     GLint exposureLoc = glGetUniformLocation(activeProgramID, "exposure");
-    if (exposureLoc >= 0) {
-        glUniform1f(exposureLoc, lightingState.exposure);
-    }
+    if (exposureLoc >= 0) glUniform1f(exposureLoc, lightingState.exposure);
 }
 
 std::mutex ecsMutex;
@@ -314,11 +263,8 @@ std::atomic<bool> isGameRunning{true};
 /*******************************************************************************/
 
 int main(int argc, char** argv) {
-    
-    // Initialisation de GLFW
     if( !glfwInit() ) {
         fprintf(stderr, "Failed to initialize GLFW\n");
-        getchar();
         return -1;
     }
     glfwWindowHint(GLFW_SAMPLES, 4);
@@ -329,22 +275,15 @@ int main(int argc, char** argv) {
 
     window = glfwCreateWindow( 1024, 720, "Voxel Engine - Prototype", NULL, NULL);
     if( window == NULL ){
-        fprintf(stderr, "Failed to open GLFW window.\n");
-        getchar();
         glfwTerminate();
         return -1;
     }
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
-    // Note: Key callbacks removed - using polling via DebugInputSystem instead
-    
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-    // Initialize GLEW
     glewExperimental = true; 
     if (glewInit() != GLEW_OK) {
-        fprintf(stderr, "Failed to initialize GLEW\n");
-        getchar();
         glfwTerminate();
         return -1;
     }
@@ -353,14 +292,9 @@ int main(int argc, char** argv) {
     glfwPollEvents();
     glfwSetCursorPos(window, 1024/2, 720/2);
 
-    // Couleur de fond (Ciel bleu typique)
     glClearColor(0.39f, 0.65f, 0.85f, 1.0f);
-
-    // Enable depth test
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-
-    // Enable face culling for performance (CCW winding order)
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
@@ -368,32 +302,20 @@ int main(int argc, char** argv) {
     glGenVertexArrays(1, &VertexArrayID);
     glBindVertexArray(VertexArrayID);
 
-    // Chargement du shader générique
     GLuint basicProgramID = LoadShaders("assets/shaders/vertex_shader.glsl", "assets/shaders/fragment_shader.glsl");
-    glUseProgram(basicProgramID);
-    
-    // Chargement du shader PBR
     GLuint pbrProgramID = LoadShaders("assets/shaders/pbr_vertex.glsl", "assets/shaders/pbr_fragment.glsl");
     
-    // Initialisation du BlockTextureManager
     BlockTextureManager::initialize();
     
-    // === INITIALISATION ImGui ===
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = "build/imgui.ini";
     ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 150");
     
-    // === INITIALISATION DU MONDE ECS ===
-    
-    printf("=== ECS Monde Initialization ===\n");
-    printf("Initialisation de la Registry ECS...\n");
-    
     Registry registry;
-    
-
 
     auto deltaTimeView = registry.view<DeltaTimeComponent>();
     if (deltaTimeView.isEmpty()) {
@@ -403,7 +325,6 @@ int main(int argc, char** argv) {
     }
     DeltaTimeComponent& deltaTimeComponent = registry.getComponent<DeltaTimeComponent>(*deltaTimeView.begin());
 
-    // Créer les systèmes
     DeltaTimeSystem deltaTimeSystem;
     ChunkMeshingSystem meshingSystem;
     RenderSystem renderSystem;
@@ -420,7 +341,6 @@ int main(int argc, char** argv) {
     CollisionSystem collisionSystem;
     PlayerInteractionSystem interactionSystem;
 
-    // Systèmes terrain et pathfinding
     TerrainConfig config = LoadConfig("config.txt");
     TerrainSystem terrainSystem(config);
     PathFindingSystem pathFindingSystem;
@@ -428,19 +348,21 @@ int main(int argc, char** argv) {
     const TestSceneMode selectedScene = parseSceneMode(argc, argv);
     const bool useInfiniteTerrain = (selectedScene == TestSceneMode::InfiniteTerrain);
 
-    printf("Scene de test activee: %s\n", sceneName(selectedScene));
-    printf("Ligne de commande: 1=simple subchunk, 2=chunk genere, 3=terrain infini\n");
-    
-    printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem).\n");
-    printf("Caméra initialisée en mode FREE_CAMERA.\n");
-    printf("Contrôles: WASD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation, F4=AO, F5=hemi ambiant, F6=ambiance\n");
-    printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
-
     EntityID camEntity = registry.createEntity();
     registry.addComponent(camEntity, TransformComponent{
         glm::vec3(50,100,50),
         glm::vec3(0,0,0)
     });
+
+    // === MODIFICATION : BLOCS DE DEPART POUR L'INVENTAIRE ===
+    InventoryComponent initialInventory;
+    initialInventory.items[VoxelType::GRASS] = 64;
+    initialInventory.items[VoxelType::DIRT] = 64;
+    initialInventory.items[VoxelType::STONE] = 64;
+    initialInventory.items[VoxelType::WOOD] = 64;
+    initialInventory.items[VoxelType::DIAMOND] = 5;
+    registry.addComponent(camEntity, initialInventory);
+    
     registry.addComponent(camEntity, CameraComponent{ .isActive = true});
     registry.addComponent(camEntity, InputReceiverComponent{});
     registry.addComponent(camEntity, RigidBodyComponent{});
@@ -455,27 +377,17 @@ int main(int argc, char** argv) {
     
     EntityID spectatorCamera = registry.createEntity();
     registry.addComponent(spectatorCamera, CameraComponent{});
-    registry.addComponent(spectatorCamera, TransformComponent{
-        glm::vec3(50,100,50),
-        glm::vec3(0,0,0)
-    });
+    registry.addComponent(spectatorCamera, TransformComponent{ glm::vec3(50,100,50), glm::vec3(0,0,0) });
     registry.addComponent(spectatorCamera, InputReceiverComponent{});
-    registry.addComponent(spectatorCamera, VelocityComponent{ .movementSpeed = 6.f}); //définit la speed camSpec ici si besoin
-
-    //positionCameraForScene(registry, spectatorCamera, selectedScene);
+    registry.addComponent(spectatorCamera, VelocityComponent{ .movementSpeed = 6.f});
     cameraSystem.initCamera(registry, spectatorCamera, 90, 0, glm::vec3(0,0,0));
 
-    // Create skybox entity
     EntityID skyboxEntity = registry.createEntity();
     skyboxSystem.initialize();
     registry.addComponent(skyboxEntity, SkyboxComponent{ .VAO = 0, .VBO = 0, .EBO = 0, .indexCount = 36 });
-    registry.addComponent(skyboxEntity, TransformComponent{
-        glm::vec3(0, 0, 0),
-        glm::vec3(0, 0, 0)
-    });
+    registry.addComponent(skyboxEntity, TransformComponent{ glm::vec3(0), glm::vec3(0) });
     skyboxSystem.initializeSkyboxGeometry(registry, skyboxEntity);
 
-    // Create TimeManager entity
     EntityID timeManagerEntity = registry.createEntity();
     TimeComponent timeComp;
     timeComp.dayTime = dayTime;
@@ -484,7 +396,6 @@ int main(int argc, char** argv) {
     timeComp.ambientPreset = useReducedAmbient ? TimeComponent::AmbientPreset::CRISP : TimeComponent::AmbientPreset::SOFT;
     registry.addComponent(timeManagerEntity, timeComp);
 
-    // Create LightingManager entity
     EntityID lightingManagerEntity = registry.createEntity();
     LightingStateComponent lightingComp;
     lightingComp.useHemisphericalAmbient = useHemisphericalAmbient;
@@ -506,40 +417,26 @@ int main(int argc, char** argv) {
         TestScenes::createInfiniteTerrainScene(registry);
     }
 
-    //Setup curseur au demarrage
     inputSystem.setCursorMode(window, true);
 
-    int major, minor, rev;
-    glfwGetVersion(&major, &minor, &rev);
-    printf("Version GLFW : %d.%d.%d\n", major, minor, rev);
-
-    printf("Systèmes ECS créés (ChunkMeshingSystem, RenderSystem, InputSystem, CameraSystem).\n");
-    printf("Caméra initialisée.\n");
-    printf("Contrôles: ZQSD=mouvement XZ, Space/Ctrl=haut/bas, Souris=rotation, F4=AO, F5=hemi ambiant, F6=ambiance\n");
-    printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
-
     bool isLoading = useInfiniteTerrain;
-    const int TARGET_CHUNKS = useInfiniteTerrain ? 9 * 9 : 0; // (Rayon  * 2 + 1)^2 rayon = 14
+    const int TARGET_CHUNKS = useInfiniteTerrain ? 9 * 9 : 0; 
 
     unsigned int numThreads = std::thread::hardware_concurrency();
-    if (numThreads == 0) numThreads = 4; // Sécurité
+    if (numThreads == 0) numThreads = 4; 
 
     std::vector<std::thread> workers;
     if (useInfiniteTerrain) {
-        printf("Lancement de %d threads de maillage en parallele !\n", numThreads);
         for (unsigned int i = 0; i < numThreads; ++i) {
             workers.emplace_back(MeshingWorkerThread, std::ref(registry), std::ref(terrainSystem), std::ref(meshingSystem));
         }
     }
-    do {
-        // Calcul du deltaTime
 
+    do {
         deltaTimeSystem.update(deltaTimeComponent);
         float deltaTime = deltaTimeComponent.deltaTime;
 
-        // Ensure GLFW processes events early so glfwGetKey states are fresh.
         glfwPollEvents();
-
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (useInfiniteTerrain) {
@@ -554,18 +451,11 @@ int main(int argc, char** argv) {
 
             if (isLoading) {
                 currentMeshesReady = meshingSystem.getCompletedMeshCount(registry);
-                if (currentMeshesReady >= totalExpectedMeshes) {
-                    isLoading = false;
-                }
+                if (currentMeshesReady >= totalExpectedMeshes) isLoading = false;
             }
 
             if (isLoading) {
-
-                if (windowSystem.update(registry, window)) {
-                    inputSystem.resetMouseTracking(window);
-                }
-                
-                // Handle debug inputs (day/night cycle, render toggles)
+                if (windowSystem.update(registry, window)) inputSystem.resetMouseTracking(window);
                 debugInputSystem.update(registry, window, deltaTime);
 
                 ImGui_ImplOpenGL3_NewFrame();
@@ -576,118 +466,120 @@ int main(int argc, char** argv) {
                 glEnable(GL_DEPTH_TEST);
 
             } else {
+                // === MODIFICATION : GESTION SOURIS ET BLOCAGE INPUTS (TERRAIN INFINI) ===
+                auto& playerInv = registry.getComponent<InventoryComponent>(camEntity);
+                static bool wasUIOpen = false;
 
-                inputSystem.update(registry, window);
-                cameraSystem.update(registry, deltaTime);
-                if (windowSystem.update(registry, window)) {
-                    inputSystem.resetMouseTracking(window);
+                if (playerInv.isOpen != wasUIOpen) {
+                    if (playerInv.isOpen) {
+                        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                    } else {
+                        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                        inputSystem.resetMouseTracking(window);
+                    }
+                    wasUIOpen = playerInv.isOpen;
                 }
-                    
+
+                if (!playerInv.isOpen) {
+                    inputSystem.update(registry, window);
+                    cameraSystem.update(registry, deltaTime);
+                    interactionSystem.update(registry, terrainSystem);
+                    if (windowSystem.update(registry, window)) inputSystem.resetMouseTracking(window);
+                } else {
+                    auto& input = registry.getComponent<InputReceiverComponent>(camEntity);
+                    input.moveForward = false; input.moveBackward = false;
+                    input.moveLeft = false;    input.moveRight = false;
+                    input.jump = false;        input.leftClick = false; input.rightClick = false;
+                }
+
                 movementSystem.update(registry, deltaTime);
                 physicsSystem.update(registry, deltaTime);
                 collisionSystem.update(registry, deltaTime);
-                interactionSystem.update(registry, terrainSystem);
-
                 pathFindingSystem.update(registry);
-                
-                // Handle debug inputs (day/night cycle, render toggles)
                 debugInputSystem.update(registry, window, deltaTime);
-
-                // Systèmes physiques et interactions (main)
-                movementSystem.update(registry, deltaTime);
-                physicsSystem.update(registry, deltaTime);
-                collisionSystem.update(registry, deltaTime);
-                interactionSystem.update(registry, terrainSystem);
-                cameraSystem.update(registry, deltaTime); // (Seulement dans le else, comme dans leur code)
-                pathFindingSystem.update(registry);
-                
-                // Handle debug inputs (day/night cycle, render toggles)
-                debugInputSystem.update(registry, window, deltaTime);
-
-                // Update time system (day/night cycle) (HEAD)
                 timeSystem.update(registry, deltaTime);
-                
-                // Calculate lighting state from time (HEAD)
                 lightingSystem.update(registry);
-                
-                // Sync components to globals for backward compatibility (HEAD)
                 syncComponentsToGlobals(registry);
 
                 GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
                 BlockTextureManager::bindArrays(activeProgramID);
-
                 glUseProgram(activeProgramID);
                 applyActiveShaderUniforms(activeProgramID, registry);
 
-                // Toggle Wireframe JUSTE pour le terrain
-                if (debugSystem.isWireframe()) {
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                }
-
-                // Render terrain (Un seul appel suffit !)
+                if (debugSystem.isWireframe()) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 renderSystem.update(registry, activeProgramID);
-                
-                // Reset Fill mode pour la skybox
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-                // Render skybox
                 skyboxSystem.update(registry, getRenderDebugState(registry));
 
+                // === MODIFICATION : REPARATION CYCLE DE RENDU IMGUI ===
                 ImGui_ImplOpenGL3_NewFrame();
+                ImGui::NewFrame(); 
+
                 debugSystem.update(registry, window, deltaTime, getRenderDebugState(registry));
+                debugSystem.renderInventoryUI(registry, camEntity, window); 
+
+                ImGui::Render(); 
                 
                 glDisable(GL_DEPTH_TEST);
                 ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
                 glEnable(GL_DEPTH_TEST);
             }
         } else {
-            inputSystem.update(registry, window);
-            if (windowSystem.update(registry, window)) {
-                inputSystem.resetMouseTracking(window);
-            }   
+            // === MODIFICATION : GESTION SOURIS ET BLOCAGE INPUTS (SCENE STATIQUE) ===
+            auto& playerInv = registry.getComponent<InventoryComponent>(camEntity);
+            static bool wasUIOpen = false;
 
-            // Systèmes physiques et interactions (main)
+            if (playerInv.isOpen != wasUIOpen) {
+                if (playerInv.isOpen) {
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                } else {
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                    inputSystem.resetMouseTracking(window);
+                }
+                wasUIOpen = playerInv.isOpen;
+            }
+
+            if (!playerInv.isOpen) {
+                inputSystem.update(registry, window);
+                cameraSystem.update(registry, deltaTime);
+                interactionSystem.update(registry, terrainSystem);
+                if (windowSystem.update(registry, window)) inputSystem.resetMouseTracking(window);
+            } else {
+                auto& input = registry.getComponent<InputReceiverComponent>(camEntity);
+                input.moveForward = false; input.moveBackward = false;
+                input.moveLeft = false;    input.moveRight = false;
+                input.jump = false;        input.leftClick = false; input.rightClick = false;
+            }
+
             movementSystem.update(registry, deltaTime);
             physicsSystem.update(registry, deltaTime);
             collisionSystem.update(registry, deltaTime);
-            interactionSystem.update(registry, terrainSystem);
-            cameraSystem.update(registry, deltaTime); // (Seulement dans le else, comme dans leur code)
             pathFindingSystem.update(registry);
-            
-            // Handle debug inputs (day/night cycle, render toggles)
             debugInputSystem.update(registry, window, deltaTime);
-
-            // Update time system (day/night cycle) (HEAD)
             timeSystem.update(registry, deltaTime);
-            
-            // Calculate lighting state from time (HEAD)
             lightingSystem.update(registry);
-            
-            // Sync components to globals for backward compatibility (HEAD)
             syncComponentsToGlobals(registry);
 
             GLuint activeProgramID = usePbrShader ? pbrProgramID : basicProgramID;
             BlockTextureManager::bindArrays(activeProgramID);
-
             glUseProgram(activeProgramID);
             applyActiveShaderUniforms(activeProgramID, registry);
 
-            // Toggle Wireframe JUSTE pour le terrain
-            if (debugSystem.isWireframe()) {
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            }
-
-            // Render terrain (Un seul appel suffit !)
+            if (debugSystem.isWireframe()) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             renderSystem.update(registry, activeProgramID);
-            
-            // Reset Fill mode pour la skybox
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-            // Render skybox
             skyboxSystem.update(registry, getRenderDebugState(registry));
 
+            // === REPARATION CYCLE DE RENDU IMGUI (SCENE STATIQUE) ===
             ImGui_ImplOpenGL3_NewFrame();
+            ImGui::NewFrame();
+
             debugSystem.update(registry, window, deltaTime, getRenderDebugState(registry));
+            debugSystem.renderInventoryUI(registry, camEntity, window); 
+
+            ImGui::Render();
             
             glDisable(GL_DEPTH_TEST);
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -695,23 +587,17 @@ int main(int argc, char** argv) {
         }
 
         glfwSwapBuffers(window);
-        // NOTE: glfwPollEvents() already called at frame start (line 579)
-        // Calling it again here resets key states and breaks checkKeyEdge tracking
-
     } 
     while( (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) && (glfwWindowShouldClose(window) == 0) );
 
     isGameRunning = false;
     for (auto& t : workers) {
-        if (t.joinable()) {
-            t.join();
-        }
+        if (t.joinable()) t.join();
     }
-    // Cleanup ImGui
+    
     ImGui_ImplOpenGL3_Shutdown();
     ImGui::DestroyContext();
 
-    // Cleanup
     glDeleteProgram(basicProgramID);
     glDeleteProgram(pbrProgramID);
     glDeleteVertexArrays(1, &VertexArrayID);
@@ -721,7 +607,6 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-// Resize callback
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
@@ -729,7 +614,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 void MeshingWorkerThread(Registry& registry, TerrainSystem& terrain, ChunkMeshingSystem& meshing) {
     while (isGameRunning) { 
         EntityID targetID;
-        
         if (!terrain.popMeshingTask(targetID)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
             continue;
@@ -740,11 +624,9 @@ void MeshingWorkerThread(Registry& registry, TerrainSystem& terrain, ChunkMeshin
 
         {
             std::lock_guard<std::mutex> ecsLock(ecsMutex);
-            
             if (!registry.hasComponent<SubChunkComponent>(targetID)) continue;
             
             centerChunkCopy = registry.getComponent<SubChunkComponent>(targetID);
-            
             if (centerChunkCopy.solidBlockCount == 0) {
                 std::lock_guard<std::mutex> uploadLock(meshing.uploadMutex);
                 meshing.uploadQueue.push({targetID, MeshData()});
@@ -762,18 +644,14 @@ void MeshingWorkerThread(Registry& registry, TerrainSystem& terrain, ChunkMeshin
                 EntityID nID = terrain.getSubChunkAt(neededPos[i].x, neededPos[i].y, neededPos[i].z, registry);
                 if (nID != 0 && registry.hasComponent<SubChunkComponent>(nID)) {
                     auto& neighbor = registry.getComponent<SubChunkComponent>(nID);
-                    if (neighbor.solidBlockCount > 0) {
-                        threadLocalChunks.push_back(neighbor);
-                    }
+                    if (neighbor.solidBlockCount > 0) threadLocalChunks.push_back(neighbor);
                 }
             }
         }
 
         subChunkCache localCache;
         localCache.push_back(&centerChunkCopy);
-        for (auto& comp : threadLocalChunks) {
-            localCache.push_back(&comp);
-        }
+        for (auto& comp : threadLocalChunks) localCache.push_back(&comp);
         
         std::sort(localCache.begin(), localCache.end(), [](const SubChunkComponent* a, const SubChunkComponent* b) {
             if (a->subChunkPosition.x != b->subChunkPosition.x) return a->subChunkPosition.x < b->subChunkPosition.x;

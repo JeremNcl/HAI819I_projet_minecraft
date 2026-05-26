@@ -9,6 +9,8 @@
 #include "ecs/components/transform.hpp"
 #include "ecs/components/chunk.hpp"
 #include "ecs/components/player.hpp"
+#include "ecs/components/inventory.hpp"
+
 
 #include <glm/glm.hpp>
 #include <limits>

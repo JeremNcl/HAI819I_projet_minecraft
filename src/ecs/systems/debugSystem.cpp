@@ -2,13 +2,110 @@
 
 extern bool debugWireframe;
 
+
+static const char* format_block_name(VoxelType type) {
+    switch(type) {
+        case VoxelType::STONE:   return "Pierre";
+        case VoxelType::DIRT:    return "Terre";
+        case VoxelType::GRASS:   return "Herbe";
+        case VoxelType::WOOD:    return "Bois";
+        case VoxelType::LEAVES:  return "Feuilles";
+        case VoxelType::BEDROCK: return "Bedrock";
+        case VoxelType::COAL:    return "Minerai de Charbon";
+        case VoxelType::IRON:    return "Minerai de Fer";
+        case VoxelType::GOLD:    return "Minerai d'Or";
+        case VoxelType::DIAMOND: return "Diamant";
+        case VoxelType::SAND:    return "Sable";
+        default:                 return "Bloc Inconnu";
+    }
+}
+// ------------------------------------------------------------------
+
+void DebugSystem::renderInventoryUI(Registry& registry, EntityID playerID, GLFWwindow* window) {
+    auto& inv = registry.getComponent<InventoryComponent>(playerID);
+    
+    // Gestion de l'ouverture avec 'V'
+    static bool prev_V = false;
+    bool curr_V = glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS;
+    if (curr_V && !prev_V) {
+        inv.isOpen = !inv.isOpen;
+    }
+    prev_V = curr_V;
+
+    ImGuiIO& io = ImGui::GetIO();
+
+    // === 1. LA HOTBAR (Toujours visible en bas) ===
+    // On la place au centre en bas (Y = DisplaySize.y - 10)
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y - 10.0f), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::Begin("Hotbar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
+    
+    // Style Minecraft avec un fond semi-transparent
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 0.7f));
+    ImGui::BeginChild("HotbarBackground", ImVec2(200, 60), true);
+    
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "> %s <", format_block_name(inv.selectedBlock));
+    int count = inv.items.find(inv.selectedBlock) != inv.items.end() ? inv.items[inv.selectedBlock] : 0;
+    ImGui::Text("Quantite : %d", count);
+    
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+    ImGui::End();
+
+    // === 2. LE SAC A DOS (Menu principal avec grille) ===
+    if (inv.isOpen) {
+        // Centrage parfait au milieu de l'écran
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        // On FORCE la taille avec ImGuiCond_Always pour écraser ta "petite fenêtre" buguée
+        ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_Always); 
+        
+        // On enlève le titre et le redimensionnement pour faire un menu de jeu immersif
+        ImGui::Begin("Inventaire", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar); 
+        
+        ImGui::TextDisabled("Appuyez sur 'V' pour fermer");
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::Text("Inventaire du joueur");
+        ImGui::Spacing();
+
+        // Création d'une grille style Minecraft (9 colonnes)
+        if (ImGui::BeginTable("InventoryGrid", 9, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit)) {
+            for (auto& [type, qty] : inv.items) {
+                if (qty > 0) {
+                    ImGui::TableNextColumn();
+                    
+                    bool isSelected = (type == inv.selectedBlock);
+                    
+                    // Si c'est le bloc sélectionné, on le met en vert fluo, sinon gris
+                    if (isSelected) {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.8f, 0.2f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.9f, 0.3f, 1.0f));
+                    }
+
+                    // Bouton carré (60x60 pixels)
+                    std::string label = std::string(format_block_name(type)) + "\n" + std::to_string(qty);
+                    if (ImGui::Button(label.c_str(), ImVec2(60, 60))) {
+                        inv.selectedBlock = type; // On équipe ce bloc au clic !
+                    }
+                    
+                    if (isSelected) {
+                        ImGui::PopStyleColor(2);
+                    }
+                }
+            }
+            ImGui::EndTable();
+        }
+        
+        ImGui::End();
+    }
+}
+
 void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTime, const RenderDebugState& renderState) {
     int displayW, displayH;
     glfwGetFramebufferSize(_window, &displayW, &displayH);
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2((float)displayW, (float)displayH);
     
-    ImGui::NewFrame();
+    //ImGui::NewFrame();
     
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(350, 450), ImGuiCond_FirstUseEver);
@@ -110,7 +207,7 @@ void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTim
     }
     ImGui::End();
 
-    ImGui::Render();
+    //ImGui::Render();
 }
 
 void DebugSystem::renderLoadingScreen(GLFWwindow* _window, int _currentMeshesReady, int _totalExpectedMeshes) {

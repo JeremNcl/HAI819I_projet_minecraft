@@ -60,6 +60,8 @@ set(IMGUI_SOURCES
 	external/imgui-1.91.0/imgui_tables.cpp
 	external/imgui-1.91.0/imgui_widgets.cpp
 	external/imgui-1.91.0/backends/imgui_impl_opengl3.cpp
+	external/imgui-1.91.0/backends/imgui_impl_glfw.cpp
+
 )
 
 # Création de l'exécutable

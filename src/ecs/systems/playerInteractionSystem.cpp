@@ -100,8 +100,11 @@ void PlayerInteractionSystem::update(Registry& _registry, TerrainSystem& _terrai
                     RaycastResult result = raycast(_registry, _terrain, transform.position + camera.offset, camera.front, player.reach);
                     if (result.hit) {
                         glm::ivec3 placePos = result.hitVoxelPos + result.normal;
-
-                        _terrain.setBlock(_registry, placePos.x, placePos.y, placePos.z, player.currentBloc);
+                        auto& inv = _registry.getComponent<InventoryComponent>(entity);
+                        if (inv.items[inv.selectedBlock] > 0) {
+                            _terrain.setBlock(_registry, placePos.x, placePos.y, placePos.z, inv.selectedBlock);
+                            inv.items[inv.selectedBlock]--;
+                        }
                     }
 
                     input.rightClick = false;
