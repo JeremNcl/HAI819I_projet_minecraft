@@ -42,6 +42,10 @@ RaycastResult PlayerInteractionSystem::raycast(Registry& _registry, TerrainSyste
                 result.hitVoxelPos = glm::ivec3(x, y, z);
                 result.normal = normal;
                 result.chunkEntity = chunkEntity;
+                
+                // CORRECTION : On enregistre le type exact du bloc pour l'inventaire
+                result.hitVoxelType = type; 
+                
                 return result;
             }
         }
@@ -49,26 +53,18 @@ RaycastResult PlayerInteractionSystem::raycast(Registry& _registry, TerrainSyste
         if (tMaxX < tMaxY) {
             if (tMaxX < tMaxZ) {
                 if (tMaxX > _reach) break;
-                x += stepX;
-                tMaxX += tDeltaX;
-                normal = glm::ivec3(-stepX, 0, 0);
+                x += stepX; tMaxX += tDeltaX; normal = glm::ivec3(-stepX, 0, 0);
             } else {
                 if (tMaxZ > _reach) break;
-                z += stepZ;
-                tMaxZ += tDeltaZ;
-                normal = glm::ivec3(0, 0, -stepZ);
+                z += stepZ; tMaxZ += tDeltaZ; normal = glm::ivec3(0, 0, -stepZ);
             }
         } else {
             if (tMaxY < tMaxZ) {
                 if (tMaxY > _reach) break;
-                y += stepY;
-                tMaxY += tDeltaY;
-                normal = glm::ivec3(0, -stepY, 0);
+                y += stepY; tMaxY += tDeltaY; normal = glm::ivec3(0, -stepY, 0);
             } else {
                 if (tMaxZ > _reach) break;
-                z += stepZ;
-                tMaxZ += tDeltaZ;
-                normal = glm::ivec3(0, 0, -stepZ);
+                z += stepZ; tMaxZ += tDeltaZ; normal = glm::ivec3(0, 0, -stepZ);
             }
         }
     }
@@ -87,26 +83,46 @@ void PlayerInteractionSystem::update(Registry& _registry, TerrainSystem& _terrai
             auto& input = _registry.getComponent<InputReceiverComponent>(entity);
 
             if (camera.isActive) {
+                
+                // ==========================================
+                // 1. CASSER UN BLOC (Clic Gauche)
+                // ==========================================
                 if (input.leftClick && player.canBreakBlocks) {
                     RaycastResult result = raycast(_registry, _terrain, transform.position + camera.offset, camera.front, player.reach);
 
                     if (result.hit) {
+                        // A. Remplacer le bloc du monde par de l'air
                         _terrain.setBlock(_registry, result.hitVoxelPos.x, result.hitVoxelPos.y, result.hitVoxelPos.z, VoxelType::AIR);
+                        
+                        // B. Ajouter le bloc à l'inventaire
+                        auto& inv = _registry.getComponent<InventoryComponent>(entity);
+                        if (inv.items[result.hitVoxelType] < 64) {
+                            inv.items[result.hitVoxelType]++; // On gagne +1
+                        }
                     }  
-
                     input.leftClick = false;
                 }
+                
+                // ==========================================
+                // 2. POSER UN BLOC (Clic Droit)
+                // ==========================================
                 if (input.rightClick) {
                     RaycastResult result = raycast(_registry, _terrain, transform.position + camera.offset, camera.front, player.reach);
+                    
                     if (result.hit) {
                         glm::ivec3 placePos = result.hitVoxelPos + result.normal;
                         auto& inv = _registry.getComponent<InventoryComponent>(entity);
+                        
+                        // A. Vérifier qu'on a bien au moins 1 bloc de ce type en stock
                         if (inv.items[inv.selectedBlock] > 0) {
+                            
+                            // B. Poser le bloc dans le monde
                             _terrain.setBlock(_registry, placePos.x, placePos.y, placePos.z, inv.selectedBlock);
+                            
+                            // C. Retirer 1 bloc de notre inventaire
                             inv.items[inv.selectedBlock]--;
                         }
                     }
-
                     input.rightClick = false;
                 }
             }

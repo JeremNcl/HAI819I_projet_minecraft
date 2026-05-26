@@ -21,6 +21,7 @@ struct RaycastResult {
     glm::ivec3 hitVoxelPos{0, 0, 0};
     glm::ivec3 normal{0, 0, 0};
     EntityID chunkEntity = 0;
+    VoxelType hitVoxelType = VoxelType::AIR; // <-- AJOUT ICI
 };
 
 class PlayerInteractionSystem {
