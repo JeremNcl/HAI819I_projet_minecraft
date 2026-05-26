@@ -68,7 +68,7 @@ int TerrainGenerator::GetIndex(int x, int y, int z) const {
     return x + (z * CHUNK_WIDTH) + (y * CHUNK_DEPTH * CHUNK_WIDTH);
 }
 
-std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX, int chunkZ, std::array<glm::vec3, CHUNK_WIDTH * CHUNK_DEPTH>* outBiomeColors) {
+std::array<std::vector<BlockType>, 16> TerrainGenerator::GenerateChunk(int chunkX, int chunkZ, std::array<glm::vec3, CHUNK_WIDTH * CHUNK_DEPTH>* outBiomeColors) {
     std::vector<BlockType> blocks(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH, BlockType::AIR);
     std::vector<glm::ivec3> treesToGenerate;
 
@@ -77,24 +77,49 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
     terrainNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
     terrainNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
     terrainNoise.SetFractalOctaves(4);
-    terrainNoise.SetFractalLacunarity(2.0f);
-    terrainNoise.SetFractalGain(0.5f);
-
-    FastNoiseLite caveNoise;
-    caveNoise.SetSeed(m_seed);
-    caveNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    terrainNoise.SetFrequency(m_config.terrainFreq);
 
     FastNoiseLite biomeNoise;
     biomeNoise.SetSeed(m_seed);
     biomeNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-
-    terrainNoise.SetFrequency(m_config.terrainFreq);
-    caveNoise.SetFrequency(m_config.caveFreq);
     biomeNoise.SetFrequency(m_config.biomeFreq);
+
+    FastNoiseLite densityNoise;
+    densityNoise.SetSeed(m_seed + 123); 
+    densityNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    densityNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    densityNoise.SetFractalOctaves(3); 
+    densityNoise.SetFrequency(0.015f); 
 
     if (outBiomeColors) {
         outBiomeColors->fill(glm::vec3(1.0f));
     }
+
+    constexpr int STEP_X = 4;
+    constexpr int STEP_Y = 8;
+    constexpr int STEP_Z = 4;
+    
+    constexpr int GRID_X = (CHUNK_WIDTH / STEP_X) + 1;
+    constexpr int GRID_Y = (CHUNK_HEIGHT / STEP_Y) + 1;
+    constexpr int GRID_Z = (CHUNK_DEPTH / STEP_Z) + 1;
+
+    float coarseNoise[GRID_X][GRID_Y][GRID_Z];
+
+    for (int gx = 0; gx < GRID_X; ++gx) {
+        for (int gy = 0; gy < GRID_Y; ++gy) {
+            for (int gz = 0; gz < GRID_Z; ++gz) {
+                float globalX = (chunkX * CHUNK_WIDTH) + (gx * STEP_X);
+                float globalY = gy * STEP_Y;
+                float globalZ = (chunkZ * CHUNK_DEPTH) + (gz * STEP_Z);
+                
+                coarseNoise[gx][gy][gz] = densityNoise.GetNoise(globalX, globalY * 1.5f, globalZ);
+            }
+        }
+    }
+
+    auto lerp = [](float a, float b, float t) {
+        return a + t * (b - a);
+    };
 
     for (int z = 0; z < CHUNK_DEPTH; ++z) {
         for (int x = 0; x < CHUNK_WIDTH; ++x) {
@@ -102,9 +127,7 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
             float globalX = (chunkX * CHUNK_WIDTH) + x;
             float globalZ = (chunkZ * CHUNK_DEPTH) + z;
 
-            float noiseValue = terrainNoise.GetNoise(globalX, globalZ);
             float biomeValue = biomeNoise.GetNoise(globalX, globalZ);
-
             float dW = std::max(0.0f, 1.0f - std::abs(biomeValue + 0.5f) / 0.5f);
             float mW = std::max(0.0f, 1.0f - std::abs(biomeValue - 0.5f) / 0.5f);
             float pW = 1.0f - dW - mW;
@@ -113,48 +136,103 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
                 (*outBiomeColors)[x + z * CHUNK_WIDTH] = computeBiomeTint(dW, pW, mW);
             }
 
-            int localHeight = (int)(dW * m_config.heightDesert + 
-                                    pW * m_config.heightPlains + 
-                                    mW * m_config.heightMountain);
+            float noise2D = terrainNoise.GetNoise(globalX, globalZ);
+            float baseHeight = (dW * m_config.heightDesert + 
+                                pW * m_config.heightPlains + 
+                                mW * m_config.heightMountain) + (noise2D * 15.0f);
 
-            float dynamicAmplitude = (dW * 8.0f) + (pW * 5.0f) + (mW * 45.0f);
-            float sculpt = noiseValue * noiseValue * noiseValue; 
+            enum class Biome { DESERT, PLAINS, MOUNTAIN };
+            Biome currentBiome = Biome::PLAINS;
+            if (biomeValue < -0.2f) currentBiome = Biome::DESERT;
+            else if (biomeValue > 0.3f) currentBiome = Biome::MOUNTAIN;
 
-            int terrainHeight = localHeight + static_cast<int>(sculpt * dynamicAmplitude);
-            terrainHeight = std::max(0, std::min(terrainHeight, CHUNK_HEIGHT - 1));
-            for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+            const int WATER_LEVEL = 50;
+            int depth = 0; 
+            int highestGrassY = -1;
+
+            int gx0 = x / STEP_X;
+            int gx1 = gx0 + 1;
+            float tx = static_cast<float>(x % STEP_X) / STEP_X;
+
+            int gz0 = z / STEP_Z;
+            int gz1 = gz0 + 1;
+            float tz = static_cast<float>(z % STEP_Z) / STEP_Z;
+
+            for (int y = CHUNK_HEIGHT - 1; y >= 0; --y) {
                 int index = GetIndex(x, y, z);
                 
-                if (y < terrainHeight) {
-                    if (y == terrainHeight - 1) {
-                        blocks[index] = BlockType::GRASS;
-                    } else if (y > terrainHeight - 4) {
-                        blocks[index] = BlockType::DIRT;
+                if (y == 0) {
+                    blocks[index] = BlockType::BEDROCK;
+                    continue;
+                }
+
+                int gy0 = y / STEP_Y;
+                int gy1 = gy0 + 1;
+                float ty = static_cast<float>(y % STEP_Y) / STEP_Y;
+
+                float c000 = coarseNoise[gx0][gy0][gz0];
+                float c100 = coarseNoise[gx1][gy0][gz0];
+                float c010 = coarseNoise[gx0][gy1][gz0];
+                float c110 = coarseNoise[gx1][gy1][gz0];
+                float c001 = coarseNoise[gx0][gy0][gz1];
+                float c101 = coarseNoise[gx1][gy0][gz1];
+                float c011 = coarseNoise[gx0][gy1][gz1];
+                float c111 = coarseNoise[gx1][gy1][gz1];
+
+                float v00 = lerp(c000, c100, tx);
+                float v01 = lerp(c001, c101, tx);
+                float v10 = lerp(c010, c110, tx);
+                float v11 = lerp(c011, c111, tx);
+
+                float v0 = lerp(v00, v10, ty);
+                float v1 = lerp(v01, v11, ty);
+
+                float noise3D = lerp(v0, v1, tz);
+
+                float globalY = static_cast<float>(y);
+                float falloff = (baseHeight - globalY) * 0.12f; 
+                float finalDensity = falloff + noise3D;
+
+                if (finalDensity > 0.0f) {
+                    if (depth == 0) {
+                        if (currentBiome == Biome::DESERT) {
+                            blocks[index] = BlockType::SAND;
+                        } else if (currentBiome == Biome::MOUNTAIN && y > 100) {
+                            blocks[index] = BlockType::STONE;
+                        } else {
+                            blocks[index] = (y <= WATER_LEVEL + 1) ? BlockType::SAND : BlockType::GRASS;
+                            if (highestGrassY == -1 && blocks[index] == BlockType::GRASS) highestGrassY = y;
+                        }
+                    } else if (depth < 4) {
+                        if (currentBiome == Biome::DESERT || y <= WATER_LEVEL) {
+                            blocks[index] = BlockType::SAND;
+                        } else {
+                            blocks[index] = BlockType::DIRT;
+                        }
                     } else {
                         blocks[index] = BlockType::STONE;
                     }
-                } else if (y == 0) {
-                    blocks[index] = BlockType::BEDROCK;
+                    depth++; 
                 } else {
-                    blocks[index] = BlockType::AIR;
-                }
-
-                float caveNoiseValue = caveNoise.GetNoise(globalX, static_cast<float>(y), globalZ);
-                if (caveNoiseValue < m_config.caveThreshold && y > 10 && y < terrainHeight - 5) {
-                    blocks[index] = BlockType::AIR;
+                    if (y <= WATER_LEVEL) {
+                        blocks[index] = BlockType::WATER;
+                    } else {
+                        blocks[index] = BlockType::AIR;
+                    }
+                    depth = 0; 
                 }
             }
 
-            int surfaceY = terrainHeight;
             bool isAwayFromEdge = (x >= 2 && x < CHUNK_WIDTH - 2 && z >= 2 && z < CHUNK_DEPTH - 2);
 
-            if (isAwayFromEdge) {
+            if (isAwayFromEdge && highestGrassY > WATER_LEVEL && currentBiome == Biome::PLAINS) {
                 if ((std::rand() % 1000) < m_config.treeChance) {
-                    treesToGenerate.push_back(glm::ivec3(x, surfaceY, z));
+                    treesToGenerate.push_back(glm::ivec3(x, highestGrassY + 1, z));
                 }
             }
         }
     }
+    
     for (const auto& pos : treesToGenerate) {
         GenerateTree(pos.x, pos.y, pos.z, blocks);
     }
@@ -207,7 +285,6 @@ std::array<std::vector<BlockType>,16> TerrainGenerator::GenerateChunk(int chunkX
 
     return subChunks;
 }
-
 void TerrainGenerator::GenerateTree(int startX, int startY, int startZ, std::vector<BlockType>& blocks) const {
     int trunkHeight = 4 + (std::rand() % 3);
 
