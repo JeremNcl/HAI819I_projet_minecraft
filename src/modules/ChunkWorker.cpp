@@ -54,11 +54,12 @@ void ChunkWorker::processTasks() {
         if (!loadedFromDisk) {
             std::array<glm::vec3, TerrainGenerator::CHUNK_WIDTH * TerrainGenerator::CHUNK_DEPTH> rawBiomeColors;
             
+            // Génération brute des blocs et récupération des couleurs du biome
             auto generatedData = m_generator.GenerateChunk(task.first, task.second, &rawBiomeColors);
             
             resultTask.chunkData.x = task.first;
             resultTask.chunkData.z = task.second;
-            resultTask.chunkData.biomeColors = rawBiomeColors;
+            resultTask.chunkData.biomeColors = rawBiomeColors; // <-- Assignation des couleurs générées
             resultTask.chunkData.subChunkMask = 0;
 
             for (int subY = 0; subY < 16; ++subY) {
@@ -97,6 +98,14 @@ void ChunkWorker::processTasks() {
                 } else {
                     resultTask.chunkData.subChunksVoxels[subY].clear();
                 }
+            }
+        } else {
+            // SÉCURITÉ : Si le chunk a été chargé depuis le disque, on vérifie que
+            // biomeColors n'est pas vide ou corrompu (ex: tout noir à 0,0,0)
+            if (resultTask.chunkData.biomeColors[0] == glm::vec3(0.0f)) {
+                // Optionnel: Si tes textures sont noires/absentes après chargement,
+                // force ici une couleur blanche par défaut pour tester si le problème vient du fichier :
+                resultTask.chunkData.biomeColors.fill(glm::vec3(1.0f));
             }
         }
 

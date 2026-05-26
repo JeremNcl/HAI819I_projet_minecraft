@@ -54,7 +54,9 @@ private:
                     }
                 }
                 
-                ChunkSerializer::SaveChunk(dto);
+                if (biomesCopied) {
+                    ChunkSerializer::SaveChunk(dto);
+                }
             }
             
             for (EntityID subChunkID : chunkComp.subChunks) {
@@ -250,12 +252,6 @@ public:
         VoxelType oldType = mySub.getVoxel(localX, localY, localZ);
     
         if (oldType == type) return;
-
-        if (oldType != VoxelType::AIR && type == VoxelType::AIR) {
-            mySub.solidBlockCount--;
-        } else if (oldType == VoxelType::AIR && type != VoxelType::AIR) {
-            mySub.solidBlockCount++;
-        }
 
         mySub.setVoxel(localX, localY, localZ, type);
         
