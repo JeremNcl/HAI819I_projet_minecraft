@@ -65,12 +65,15 @@ void BlockTextureManager::initialize() {
     success &= appendTextureSet(std::string(kSourceTextureRoot) + "/dirt.texture_set.json",      colorPaths, normalPaths, metallicPaths, normalStrengths, 2);
     success &= appendTextureSet(std::string(kSourceTextureRoot) + "/grass_top.texture_set.json",  colorPaths, normalPaths, metallicPaths, normalStrengths, 3);
     success &= appendTextureSet(std::string(kSourceTextureRoot) + "/grass_side.texture_set.json", colorPaths, normalPaths, metallicPaths, normalStrengths, 4);
-    
-    // Nouveaux blocs demandés
     success &= appendTextureSet(std::string(kSourceTextureRoot) + "/sand.texture_set.json",       colorPaths, normalPaths, metallicPaths, normalStrengths, 5);
     success &= appendTextureSet(std::string(kSourceTextureRoot) + "/log_oak_top.texture_set.json", colorPaths, normalPaths, metallicPaths, normalStrengths, 6);
     success &= appendTextureSet(std::string(kSourceTextureRoot) + "/log_oak.texture_set.json",     colorPaths, normalPaths, metallicPaths, normalStrengths, 7); // Écorce latérale
     success &= appendTextureSet(std::string(kSourceTextureRoot) + "/leaves_oak.texture_set.json",  colorPaths, normalPaths, metallicPaths, normalStrengths, 8);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/bedrock.texture_set.json",      colorPaths, normalPaths, metallicPaths, normalStrengths, 9);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/coal_ore.texture_set.json",     colorPaths, normalPaths, metallicPaths, normalStrengths, 10);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/iron_ore.texture_set.json",     colorPaths, normalPaths, metallicPaths, normalStrengths, 11);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/gold_ore.texture_set.json",     colorPaths, normalPaths, metallicPaths, normalStrengths, 12);
+    success &= appendTextureSet(std::string(kSourceTextureRoot) + "/diamond_ore.texture_set.json",  colorPaths, normalPaths, metallicPaths, normalStrengths, 13);
 
     if (!success) {
         std::cerr << "Pack PBR incomplet dans le dossier source, application du fallback local." << std::endl;
@@ -83,6 +86,11 @@ void BlockTextureManager::initialize() {
         colorPaths[6] = "assets/textures/blocks/log_oak_top.tga";
         colorPaths[7] = "assets/textures/blocks/log_oak.tga";
         colorPaths[8] = "assets/textures/blocks/leaves_oak.tga";
+        colorPaths[9] = "assets/textures/blocks/bedrock.tga";
+        colorPaths[10] = "assets/textures/blocks/coal_ore.tga";
+        colorPaths[11] = "assets/textures/blocks/iron_ore.tga";
+        colorPaths[12] = "assets/textures/blocks/gold_ore.tga";
+        colorPaths[13] = "assets/textures/blocks/diamond_ore.tga";
     }
 
     colorArrayID    = loadTextureArray(colorPaths);

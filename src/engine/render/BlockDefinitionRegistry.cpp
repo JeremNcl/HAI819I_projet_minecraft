@@ -27,18 +27,16 @@ void BlockDefinitionRegistry::initialize() {
     g_definitions[static_cast<size_t>(VoxelType::STONE)]  = makeDefinition(1, 1, 1);
     g_definitions[static_cast<size_t>(VoxelType::DIRT)]   = makeDefinition(2, 2, 2);
     g_definitions[static_cast<size_t>(VoxelType::GRASS)]  = makeDefinition(3, 2, 4); // Haut=3, Bas=2, Côtés=4
-    
-    // Nouveaux Blocs configurés
     g_definitions[static_cast<size_t>(VoxelType::SAND)]   = makeDefinition(5, 5, 5);
     g_definitions[static_cast<size_t>(VoxelType::WOOD)]   = makeDefinition(6, 6, 7); // Section tronc=6, Écorce=7
     g_definitions[static_cast<size_t>(VoxelType::LEAVES)] = makeDefinition(8, 8, 8);
+    g_definitions[static_cast<size_t>(VoxelType::BEDROCK)] = makeDefinition(9, 9, 9);
+    g_definitions[static_cast<size_t>(VoxelType::COAL)]    = makeDefinition(10, 10, 10);
+    g_definitions[static_cast<size_t>(VoxelType::IRON)]    = makeDefinition(11, 11, 11);
+    g_definitions[static_cast<size_t>(VoxelType::GOLD)]    = makeDefinition(12, 12, 12);
+    g_definitions[static_cast<size_t>(VoxelType::DIAMOND)] = makeDefinition(13, 13, 13);
 
     // Les blocs ci-dessous afficheront la grille d'erreur en attendant leurs assets PBR
-    g_definitions[static_cast<size_t>(VoxelType::BEDROCK)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::COAL)]    = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::IRON)]    = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::GOLD)]    = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::DIAMOND)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
     g_definitions[static_cast<size_t>(VoxelType::LAVA)]    = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
     g_definitions[static_cast<size_t>(VoxelType::WATER)]   = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
 
