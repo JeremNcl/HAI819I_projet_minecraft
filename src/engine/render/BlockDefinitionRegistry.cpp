@@ -1,10 +1,8 @@
 #include "BlockDefinitionRegistry.hpp"
-
 #include <array>
 
 namespace {
 constexpr size_t kVoxelTypeCount = static_cast<size_t>(VoxelType::WATER) + 1;
-
 std::array<BlockRenderDefinition, kVoxelTypeCount> g_definitions{};
 bool g_initialized = false;
 
@@ -18,51 +16,45 @@ BlockRenderDefinition makeDefinition(int topSlice, int bottomSlice, int sideSlic
 } // namespace
 
 void BlockDefinitionRegistry::initialize() {
-    if (g_initialized) {
-        return;
-    }
+    if (g_initialized) return;
 
-    g_definitions.fill(makeDefinition(0, 0, 0));
+    // Par défaut, tout pointe vers 0 (la texture d'erreur)
+    constexpr int kFallbackSlice = 0;
+    g_definitions.fill(makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice));
 
-    constexpr int kFallbackSlice = 4;
+    // Mapping de la géométrie du monde
+    g_definitions[static_cast<size_t>(VoxelType::AIR)]    = makeDefinition(0, 0, 0); // Non rendu
+    g_definitions[static_cast<size_t>(VoxelType::STONE)]  = makeDefinition(1, 1, 1);
+    g_definitions[static_cast<size_t>(VoxelType::DIRT)]   = makeDefinition(2, 2, 2);
+    g_definitions[static_cast<size_t>(VoxelType::GRASS)]  = makeDefinition(3, 2, 4); // Haut=3, Bas=2, Côtés=4
+    g_definitions[static_cast<size_t>(VoxelType::SAND)]   = makeDefinition(5, 5, 5);
+    g_definitions[static_cast<size_t>(VoxelType::WOOD)]   = makeDefinition(6, 6, 7); // Section tronc=6, Écorce=7
+    g_definitions[static_cast<size_t>(VoxelType::LEAVES)] = makeDefinition(8, 8, 8);
+    g_definitions[static_cast<size_t>(VoxelType::BEDROCK)] = makeDefinition(9, 9, 9);
+    g_definitions[static_cast<size_t>(VoxelType::COAL)]    = makeDefinition(10, 10, 10);
+    g_definitions[static_cast<size_t>(VoxelType::IRON)]    = makeDefinition(11, 11, 11);
+    g_definitions[static_cast<size_t>(VoxelType::GOLD)]    = makeDefinition(12, 12, 12);
+    g_definitions[static_cast<size_t>(VoxelType::DIAMOND)] = makeDefinition(13, 13, 13);
 
-    g_definitions[static_cast<size_t>(VoxelType::AIR)] = makeDefinition(0, 0, 0);
-    g_definitions[static_cast<size_t>(VoxelType::STONE)] = makeDefinition(0, 0, 0);
-    g_definitions[static_cast<size_t>(VoxelType::DIRT)] = makeDefinition(1, 1, 1);
-    g_definitions[static_cast<size_t>(VoxelType::GRASS)] = makeDefinition(2, 1, 3);
-    g_definitions[static_cast<size_t>(VoxelType::WOOD)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::LEAVES)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::BEDROCK)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::COAL)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::IRON)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::GOLD)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::DIAMOND)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::LAVA)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::SAND)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
-    g_definitions[static_cast<size_t>(VoxelType::WATER)] = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
+    // Les blocs ci-dessous afficheront la grille d'erreur en attendant leurs assets PBR
+    g_definitions[static_cast<size_t>(VoxelType::LAVA)]    = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
+    g_definitions[static_cast<size_t>(VoxelType::WATER)]   = makeDefinition(kFallbackSlice, kFallbackSlice, kFallbackSlice);
 
     g_initialized = true;
 }
 
 const BlockRenderDefinition& BlockDefinitionRegistry::get(VoxelType type) {
-    if (!g_initialized) {
-        initialize();
-    }
-
+    if (!g_initialized) initialize();
     size_t index = static_cast<size_t>(type);
-    if (index >= g_definitions.size()) {
-        return getDefaultDefinition();
-    }
+    if (index >= g_definitions.size()) return getDefaultDefinition();
     return g_definitions[index];
 }
 
 int BlockDefinitionRegistry::getTextureSliceIndex(VoxelType type, int axis, bool isPositive) {
     const BlockRenderDefinition& definition = get(type);
-
     if (axis == 1) {
         return isPositive ? definition.topSlice : definition.bottomSlice;
     }
-
     return definition.sideSlice;
 }
 

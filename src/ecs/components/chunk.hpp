@@ -51,9 +51,17 @@ struct SubChunkVisibility {
     }
 };
 
+/// Fonctions utilitaires pour les types de voxels ///
+
 inline bool isOpaque(VoxelType type) {
     return type != VoxelType::AIR && type != VoxelType::WATER && type != VoxelType::LAVA;
 }
+
+inline bool isTransparentForOcclusion(VoxelType type) {
+    // On veut traverser l'air, l'eau, et les feuilles pour le calcul de visibilité
+    return (type == VoxelType::AIR || type == VoxelType::WATER || type == VoxelType::LEAVES);
+}
+
 
 struct SubChunkComponent : public Component {
     std::vector<uint8_t> voxels;
