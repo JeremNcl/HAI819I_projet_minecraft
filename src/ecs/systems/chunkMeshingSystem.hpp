@@ -73,4 +73,6 @@ private:
 
     VoxelType getVoxelGlobal(const SubChunkComponent& voxelData, int x, int y, int z, const subChunkCache& cache) const;
     glm::vec3 sampleBiomeColor(const SubChunkComponent& voxelData, const glm::vec3& localPos) const;
+
+    void computeSubChunkVisibility(SubChunkComponent& subChunk);
 };
