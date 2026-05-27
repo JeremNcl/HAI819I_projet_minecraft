@@ -339,7 +339,7 @@ int main(int argc, char** argv) {
         return -1;
     }
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
+    glfwSwapInterval(0);
     // Note: Key callbacks removed - using polling via DebugInputSystem instead
     
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -466,7 +466,7 @@ int main(int argc, char** argv) {
         glm::vec3(0,0,0)
     });
     registry.addComponent(spectatorCamera, InputReceiverComponent{});
-    registry.addComponent(spectatorCamera, VelocityComponent{ .movementSpeed = 6.f}); //définit la speed camSpec ici si besoin
+    registry.addComponent(spectatorCamera, VelocityComponent{ .movementSpeed = 60.f}); //définit la speed camSpec ici si besoin
 
     //positionCameraForScene(registry, spectatorCamera, selectedScene);
     cameraSystem.initCamera(registry, spectatorCamera, 90, 0, glm::vec3(0,0,0));
@@ -525,7 +525,7 @@ int main(int argc, char** argv) {
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     bool isLoading = useInfiniteTerrain;
-    const int TARGET_CHUNKS = useInfiniteTerrain ? 9 * 9 : 0; // (Rayon  * 2 + 1)^2 rayon = 14
+    const int TARGET_CHUNKS = useInfiniteTerrain ? 10 * 14 : 0; // (Rayon  * 2 + 1)^2 rayon = 14
 
     unsigned int numThreads = std::thread::hardware_concurrency();
     if (numThreads == 0) numThreads = 4; // Sécurité
