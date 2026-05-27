@@ -1,8 +1,32 @@
 #include "debugSystem.hpp"
+#include <iomanip>
+#include <fstream>
 
 extern bool debugWireframe;
+bool startFpsRecording = false;
 
 void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTime, const RenderDebugState& renderState) {
+    if (startFpsRecording) {
+        startFpsRecording = false;
+        if (!isRecording) {
+            isRecording = true;
+            recordingTimer = 0.0f;
+            recordedDeltaTimes.clear();
+            recordedDeltaTimes.reserve(15000); 
+            std::cout << "[BENCHMARK] Debut de l'enregistrement de 15 secondes...\n";
+        }
+    }
+
+    if (isRecording) {
+        recordingTimer += deltaTime;
+        recordedDeltaTimes.push_back(deltaTime);
+
+        if (recordingTimer >= 15.0f) {
+            isRecording = false;
+            saveFpsLog();
+        }
+    }
+    
     int displayW, displayH;
     glfwGetFramebufferSize(_window, &displayW, &displayH);
     ImGuiIO& io = ImGui::GetIO();
@@ -14,6 +38,16 @@ void DebugSystem::update(Registry& registry, GLFWwindow* _window, float deltaTim
     ImGui::SetNextWindowSize(ImVec2(350, 450), ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Debug Info", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Separator();
+        if (isRecording) {
+            // Un indicateur rouge clignotant ou fixe pour avertir l'utilisateur
+            ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "● ENREGISTREMENT FPS EN COURS...");
+            ImGui::ProgressBar(recordingTimer / 15.0f, ImVec2(-1, 20.0f));
+            ImGui::Text("Frames enregistrees : %zu", recordedDeltaTimes.size());
+        } else {
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Appuyez sur 'G' pour lancer un benchmark (15s)");
+        }
+        
         // ==========================================
         // CAMERA DEBUG
         // ==========================================
@@ -140,4 +174,38 @@ void DebugSystem::renderLoadingScreen(GLFWwindow* _window, int _currentMeshesRea
 
     ImGui::End();
     ImGui::Render();
+}
+
+void DebugSystem::saveFpsLog() {
+    std::ofstream file("fps_benchmark.csv"); // Format CSV, facilement lisible sur Excel / LibreOffice
+    if (!file.is_open()) {
+        std::cerr << "[ERROR] Impossible de creer le fichier fps_benchmark.csv\n";
+        return;
+    }
+
+    float totalTime = 0.0f;
+    for (float dt : recordedDeltaTimes) {
+        totalTime += dt;
+    }
+
+    size_t totalFrames = recordedDeltaTimes.size();
+    float averageFps = (totalTime > 0.0f) ? static_cast<float>(totalFrames) / totalTime : 0.0f;
+
+    // Écriture des entêtes et du résumé analytique
+    file << "# === BENCHMARK FPS REPORT ===\n";
+    file << "# Total Frames Recus;" << totalFrames << "\n";
+    file << "# Duree Reelle (s);" << totalTime << "\n";
+    file << "# FPS MOYEN SUR 15 SECONDES;" << std::fixed << std::setprecision(2) << averageFps << "\n\n";
+    
+    // Écriture des données brutes frame par frame
+    file << "Frame Index;DeltaTime (ms);Instantaneous FPS\n";
+    for (size_t i = 0; i < totalFrames; ++i) {
+        float dt = recordedDeltaTimes[i];
+        float instantFps = (dt > 0.0f) ? 1.0f / dt : 0.0f;
+        file << i << ";" << (dt * 1000.0f) << ";" << instantFps << "\n";
+    }
+
+    file.close();
+    std::cout << "[BENCHMARK] Enregistrement termine avec succes ! Fichier 'fps_benchmark.csv' cree.\n";
+    std::cout << "[BENCHMARK] FPS Moyen : " << averageFps << "\n";
 }

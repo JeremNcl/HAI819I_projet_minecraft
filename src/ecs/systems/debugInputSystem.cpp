@@ -19,6 +19,7 @@ extern bool debugWireframe;
 extern float aoStrength;
 extern bool useFrustumCulling;
 extern bool useOcclusionCulling;
+extern bool startFpsRecording;
 
 bool DebugInputSystem::checkKeyHeld(GLFWwindow* window, int key) {
     int state = glfwGetKey(window, key);
@@ -81,6 +82,10 @@ void DebugInputSystem::update(Registry& registry, GLFWwindow* window, float delt
     for (EntityID entity : receiverView) {
         auto& input = registry.getComponent<InputReceiverComponent>(entity);
         input.toggleCameraSwap = toggleCameraSwap;
+    }
+
+    if (keyPressedOnce(window, GLFW_KEY_G, prev_G)) {
+        startFpsRecording = true; 
     }
 
     // FRUSTRUM TOGGLE 
