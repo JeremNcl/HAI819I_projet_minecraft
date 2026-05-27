@@ -39,7 +39,7 @@ public:
     std::vector<glm::ivec3> FindPath(glm::ivec3 startPos, glm::ivec3 targetPos, Registry& registry);
     
 private:
-    float GetDistance(glm::ivec3 a, glm::ivec3 b) const; // Retourne un float
+    float GetDistance(glm::ivec3 a, glm::ivec3 b) const;
     std::vector<glm::ivec3> GetValidNeighbors(glm::ivec3 currentPos, const SubChunkCache& chunkCache);
     bool IsBlockSolid(glm::ivec3 pos, const SubChunkCache& chunkCache) const;
     std::vector<glm::ivec3> RetracePath(std::unordered_map<glm::ivec3, glm::ivec3, GLMVec3Hash>& parentMap, glm::ivec3 start, glm::ivec3 end);

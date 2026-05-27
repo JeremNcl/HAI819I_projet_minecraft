@@ -21,8 +21,7 @@ glm::vec3 computeBiomeTint(float desertWeight, float plainsWeight, float mountai
 
     return normalizedDesert * desertTint + normalizedPlains * plainsTint + normalizedMountain * mountainTint;
 }
-} // namespace
-
+}
 TerrainConfig LoadConfig(const std::string& filename) {
     TerrainConfig config;
     std::ifstream file(filename);

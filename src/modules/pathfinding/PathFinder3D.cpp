@@ -89,20 +89,20 @@ std::vector<glm::ivec3> PathFinder3D::GetValidNeighbors(glm::ivec3 currentPos, c
         }
 
         glm::ivec3 upTarget = currentPos + dir + glm::ivec3(0, 1, 0);
-        if (IsBlockSolid(currentPos + dir, subChunkCache) &&                                // CORRECTION : Le bloc devant doit être solide pour servir de marche
-            !IsBlockSolid(upTarget, subChunkCache) &&                                       // Pieds de la marche vides
-            !IsBlockSolid(upTarget + glm::ivec3(0, 1, 0), subChunkCache) &&                 // Tête de la marche vide
-            !IsBlockSolid(currentPos + glm::ivec3(0, 2, 0), subChunkCache)) {               // Plafond actuel libre pour sauter
+        if (IsBlockSolid(currentPos + dir, subChunkCache) &&                              
+            !IsBlockSolid(upTarget, subChunkCache) &&                                       
+            !IsBlockSolid(upTarget + glm::ivec3(0, 1, 0), subChunkCache) &&              
+            !IsBlockSolid(currentPos + glm::ivec3(0, 2, 0), subChunkCache)) {            
             
             neighbors.push_back(upTarget);
             continue;
         }
 
         glm::ivec3 downTarget = currentPos + dir + glm::ivec3(0, -1, 0);
-        if (!IsBlockSolid(currentPos + dir, subChunkCache) &&                               // Le corps ne doit pas heurter un mur devant
-            !IsBlockSolid(currentPos + dir + glm::ivec3(0, 1, 0), subChunkCache) &&         // La tête ne doit pas heurter un mur devant
-            !IsBlockSolid(downTarget, subChunkCache) &&                                     // L'espace de chute (pieds) doit être vide
-            IsBlockSolid(downTarget + glm::ivec3(0, -1, 0), subChunkCache)) {               // CORRECTION : Il doit y avoir un sol solide pour réceptionner le zombie
+        if (!IsBlockSolid(currentPos + dir, subChunkCache) &&                          
+            !IsBlockSolid(currentPos + dir + glm::ivec3(0, 1, 0), subChunkCache) &&         
+            !IsBlockSolid(downTarget, subChunkCache) &&                            
+            IsBlockSolid(downTarget + glm::ivec3(0, -1, 0), subChunkCache)) {    
             
             neighbors.push_back(downTarget);
             continue;
@@ -124,7 +124,7 @@ bool PathFinder3D::IsBlockSolid(glm::ivec3 pos, const SubChunkCache& subChunkCac
         int localX = pos.x - (chunkX * 16);
         int localZ = pos.z - (chunkZ * 16);
 
-        VoxelType type = subChunk->getVoxel(localX, pos.y % 16, localZ); // Ajout d'un %16 au cas où localY n'est pas géré en interne
+        VoxelType type = subChunk->getVoxel(localX, pos.y % 16, localZ);
         return type != VoxelType::AIR;
     }
     return true; 

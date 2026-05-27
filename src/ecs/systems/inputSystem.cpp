@@ -43,7 +43,6 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
     bool leftClick = mousePressedOnce(_window, GLFW_MOUSE_BUTTON_LEFT);
     bool rightClick = mousePressedOnce(_window, GLFW_MOUSE_BUTTON_RIGHT);
 
-    // Commandes globales de la fenêtre moteur
     bool toggleFullscreen = keyPressedOnce(_window, GLFW_KEY_F11);
     bool toggleMonsterSpawn = keyPressedOnce(_window, GLFW_KEY_T);
     bool f11Pressed = (glfwGetKey(_window, GLFW_KEY_F11) == GLFW_PRESS);
@@ -52,7 +51,6 @@ void InputSystem::update(Registry& _registry, GLFWwindow* _window) {
         
         InputReceiverComponent& input = _registry.getComponent<InputReceiverComponent>(entity);
         
-        // Inputs de Gameplay pur
         input.moveForward = (glfwGetKey(_window, GLFW_KEY_W) == GLFW_PRESS);
         input.moveBackward = (glfwGetKey(_window, GLFW_KEY_S) == GLFW_PRESS);
         input.moveLeft = (glfwGetKey(_window, GLFW_KEY_A) == GLFW_PRESS);

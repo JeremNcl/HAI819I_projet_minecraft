@@ -5,7 +5,6 @@
 #include <GLFW/glfw3.h>
 #include "ecs/registry.hpp"
 
-// Global debug variables (controlled by this system)
 extern float dayTime;
 extern float daySpeed;
 extern bool dayPaused;
@@ -23,7 +22,6 @@ extern bool startFpsRecording;
 
 class DebugInputSystem {
     private:
-        // Key press tracking for one-time toggles
         bool prev_F1 = false;
         bool prev_F3 = false;
         bool prev_F4 = false;
@@ -40,13 +38,11 @@ class DebugInputSystem {
         bool prev_Y = false;
         bool prev_G = false;
 
-        // Previous key states for debounce detection
         bool prev_UP = false;
         bool prev_DOWN = false;
         bool prev_LEFT = false;
         bool prev_RIGHT = false;
 
-        // Repeat timers for held arrow keys
         float arrow_repeat_timer_UP = 0.0f;
         float arrow_repeat_timer_DOWN = 0.0f;
         float arrow_repeat_timer_LEFT = 0.0f;

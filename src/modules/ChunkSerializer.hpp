@@ -30,18 +30,14 @@ class ChunkSerializer {
             std::ofstream file(getFilePath(_chunk.x, _chunk.z), std::ios::binary);
             if (!file.is_open()) return;
 
-            // 1. Écriture de l'en-tête (Position et Masque)
             file.write(reinterpret_cast<const char*>(&_chunk.x), sizeof(_chunk.x));
             file.write(reinterpret_cast<const char*>(&_chunk.z), sizeof(_chunk.z));
             file.write(reinterpret_cast<const char*>(&_chunk.subChunkMask), sizeof(_chunk.subChunkMask));
 
-            // 2. Écriture des biomes (256 * vec3 = 3072 octets)
             file.write(reinterpret_cast<const char*>(_chunk.biomeColors.data()), _chunk.biomeColors.size() * sizeof(glm::vec3));
 
-            // 3. Écriture unique des sous-chunks actifs
             for (int i = 0; i < 16; ++i) {
                 if (_chunk.subChunkMask & (1 << i)) {
-                    // Sauvegarde brute des 4096 octets du sous-chunk
                     file.write(reinterpret_cast<const char*>(_chunk.subChunksVoxels[i].data()), 4096);
                 }
             }

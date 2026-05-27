@@ -100,4 +100,4 @@ void createInfiniteTerrainScene(Registry& registry) {
     printf("Chunks will be generated on-demand by TerrainSystem.\n");
 }
 
-}  // namespace TestScenes
+}

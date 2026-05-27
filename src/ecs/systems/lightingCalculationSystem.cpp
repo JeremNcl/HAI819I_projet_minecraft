@@ -2,10 +2,6 @@
 #include <glm/gtc/constants.hpp>
 #include <cmath>
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
 float LightingCalculationSystem::inverseLerp(float a, float b, float t) {
     if (b == a) return 0.0f;
     return glm::clamp((t - a) / (b - a), 0.0f, 1.0f);
@@ -14,10 +10,6 @@ float LightingCalculationSystem::inverseLerp(float a, float b, float t) {
 float LightingCalculationSystem::getSunAngle(float t) {
     return (t - 0.25f) * 2.0f * glm::pi<float>();
 }
-
-// ============================================================================
-// Lighting Calculation Functions (Migrated from main.cpp)
-// ============================================================================
 
 glm::vec3 LightingCalculationSystem::computeLightColorFromTime(float t, bool useReducedAmbient) {
     glm::vec3 dayLight    = useReducedAmbient ? glm::vec3(3.0f, 2.9f, 2.8f) : glm::vec3(2.5f, 2.4f, 2.3f);
@@ -139,10 +131,6 @@ float LightingCalculationSystem::computeExposureFromTime(float t) {
         return glm::mix(nightExposure, 2.2f, inverseLerp(-0.1f, -1.0f, elevation));
     }
 }
-
-// ============================================================================
-// Main System Update
-// ============================================================================
 
 void LightingCalculationSystem::update(Registry& registry) {
     // Find TimeComponent

@@ -16,11 +16,9 @@ using namespace std;
 
 GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path){
 
-	// Create the shaders
 	GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
 	GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
 
-	// Read the Vertex Shader code from the file
 	std::string VertexShaderCode;
 	std::ifstream VertexShaderStream(vertex_file_path, std::ios::in);
 	if(VertexShaderStream.is_open()){
@@ -34,7 +32,6 @@ GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path
 		return 0;
 	}
 
-	// Read the Fragment Shader code from the file
 	std::string FragmentShaderCode;
 	std::ifstream FragmentShaderStream(fragment_file_path, std::ios::in);
 	if(FragmentShaderStream.is_open()){
@@ -92,14 +89,12 @@ GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path
 
 
 
-	// Link the program
 	printf("Linking program\n");
 	GLuint ProgramID = glCreateProgram();
 	glAttachShader(ProgramID, VertexShaderID);
 	glAttachShader(ProgramID, FragmentShaderID);
 	glLinkProgram(ProgramID);
 
-	// Check the program
 	glGetProgramiv(ProgramID, GL_LINK_STATUS, &Result);
 	glGetProgramiv(ProgramID, GL_INFO_LOG_LENGTH, &InfoLogLength);
 	if ( InfoLogLength > 0 ){

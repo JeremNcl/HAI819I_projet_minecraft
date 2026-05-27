@@ -22,8 +22,8 @@ private:
     
     std::map<std::pair<int, int>, EntityID> activeChunks;
     
-    int renderDistance = 14;
-    int unloadDistance = 18;
+    int renderDistance = 10;
+    int unloadDistance = 14;
 
     void destroyChunkRecursive(Registry& registry, EntityID parentEntity) {
         if (registry.hasComponent<ChunkComponent>(parentEntity)) {

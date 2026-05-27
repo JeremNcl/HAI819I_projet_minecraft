@@ -23,11 +23,6 @@ VoxelType ChunkMeshingSystem::getVoxelGlobal(const SubChunkComponent& voxelData,
     if (z < 0) { neighborPos.z -= 1; localZ = 15; }
     else if (z >= 16) { neighborPos.z += 1; localZ = 0; }
 
-    /* auto it = worldMap.subChunkEntities.find(neighborPos);
-    if (it != worldMap.subChunkEntities.end()) {
-        const SubChunkComponent& neighborComponent = registry.getComponent<SubChunkComponent>(it->second);
-        return neighborComponent.getVoxel(localX, localY, localZ);
- */
     auto it = std::lower_bound(cache.begin(), cache.end(), neighborPos, [](const SubChunkComponent* comp, const glm::ivec3& pos) {
         if (comp->subChunkPosition.x != pos.x) return comp->subChunkPosition.x < pos.x;
         if (comp->subChunkPosition.y != pos.y) return comp->subChunkPosition.y < pos.y;
@@ -63,8 +58,6 @@ float ChunkMeshingSystem::sampleVertexAO(const SubChunkComponent& voxelData,
         return getVoxelGlobal(voxelData, pos.x, pos.y, pos.z, cache) != VoxelType::AIR;
     };
 
-    // Sample AO on the OUTSIDE side of the visible face to avoid leaking
-    // internal cavities (behind the wall) into external shading.
     glm::ivec3 sampleOrigin = basePos + normalDir;
 
     glm::ivec3 side1 = sampleOrigin + uDir * uSign;
@@ -149,7 +142,7 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
     glm::ivec3 uDir = axisUnit(edge1);
     glm::ivec3 vDir = axisUnit(edge2);
 
-    (void)voxelData; // kept for signature compatibility where needed
+    (void)voxelData;
     (void)cache;
 
     glm::vec2 uv0 = getUV(local_p0);
@@ -194,9 +187,6 @@ void ChunkMeshingSystem::addFace(std::vector<Vertex>& vertices,
     vertices.push_back({p2, normal, glm::vec3(uv2, texIndex), tangent, bitangent, biome2, ao2});
     vertices.push_back({p3, normal, glm::vec3(uv3, texIndex), tangent, bitangent, biome3, ao3});
 
-    // Choose the quad diagonal from AO to avoid visible interpolation seams.
-    // aoX is a lightness factor (1.0 = bright, lower = more occluded), so this
-    // condition is the inverted equivalent of the classic Minecraft AO rule.
     bool flipDiagonal = (ao0 + ao2) < (ao1 + ao3);
 
     if (!flipDiagonal) {
@@ -287,8 +277,6 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
                         return static_cast<std::uint32_t>(glm::clamp(static_cast<int>(std::round(ao * 255.0f)), 0, 255));
                     };
 
-                    // Precompute AO at grid vertices for this slice so adjacent subchunks
-                    // produce identical AO values on shared vertices.
                     int gridW = dims[u] + 1;
                     int gridH = dims[v] + 1;
                     std::vector<float> aoGrid(gridW * gridH, 1.0f);
@@ -319,8 +307,6 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
 
                             glm::ivec3 base = glm::ivec3(cornerPos) - faceNormalDir;
 
-                            // Average AO sampled in the four diagonal directions so that the
-                            // vertex AO is invariant to which adjacent quad uses it.
                             float s = 0.0f;
                             s += sampleVertexAO(voxelData, cache, base, faceNormalDir, uDir, vDir, -1, -1);
                             s += sampleVertexAO(voxelData, cache, base, faceNormalDir, uDir, vDir, +1, -1);
@@ -348,7 +334,6 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
                             
                             if (neighbor == VoxelType::AIR || isLeaves || isWood) {
                                 mask[maskIndex] = current;
-                                // Build signature from precomputed corner AO values
                                 int iCell = x[u];
                                 int jCell = x[v];
                                 int c0 = iCell + jCell * gridW;
@@ -413,7 +398,6 @@ MeshData ChunkMeshingSystem::calculateMeshData(Registry& registry, EntityID enti
 
                             glm::vec3 calculatedNormal = glm::normalize(glm::cross(edge1, edge2));
 
-                            // compute AO indices for this merged quad from precomputed aoGrid
                             int iCell = x[u];
                             int jCell = x[v];
                             int c0 = iCell + jCell * gridW;
@@ -532,7 +516,6 @@ void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) 
                     int cz = (currIndex / 16) % 16;
                     int cy = currIndex / (16 * 16);
 
-                    // Mise à jour des faces touchées
                     if (cx == 0) facesTouched[0] = true;
                     if (cx == 15) facesTouched[1] = true;
                     if (cy == 0) facesTouched[2] = true;
@@ -549,7 +532,6 @@ void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) 
                             int nIndex = getIndex(nx, ny, nz);
                             VoxelType neighborType = subChunk.getVoxel(nx, ny, nz);
 
-                            // Le BFS traverse tout ce qui n'est pas "solide" (opaque)
                             if (!visited[nIndex] && isTraversable(neighborType)) {
                                 visited[nIndex] = true;
                                 queue.push_back(nIndex);

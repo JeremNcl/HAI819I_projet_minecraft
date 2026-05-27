@@ -28,7 +28,6 @@ using namespace glm;
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 
-// Inclusions de notre moteur (Nouvelle architecture ECS)
 #include "engine/render/shader.hpp"
 #include "engine/io/textureLoader.hpp"
 #include "engine/render/BlockTextureManager.hpp"
@@ -84,12 +83,10 @@ bool useReducedAmbient = false;
 bool useFrustumCulling = true;
 bool useOcclusionCulling;
 
-// Day / Night cycle (managed by DebugInputSystem)
-float dayTime = 0.0f;      // normalized [0,1]
-float daySpeed = 0.02f;    // units per second (fraction of day per second)
+float dayTime = 0.0f;     
+float daySpeed = 0.02f; 
 bool dayPaused = false;
 
-// Ambient presets: SOFT gives higher ambient to reduce overall contrast
 static constexpr float kAmbientSoft = 0.055f;
 static constexpr float kAmbientCrisp = 0.035f;
 
@@ -160,9 +157,6 @@ static void buildStaticSceneMeshes(Registry& registry, ChunkMeshingSystem& meshi
 }
 
 
-// Derive day/night cycle parameters from normalized dayTime [0, 1]
-// dayTime: 0.0 = sunrise, 0.25 = noon, 0.5 = sunset, 0.75 = night, 1.0 = end of day
-
 static float inverseLerp(float a, float b, float v) {
     return glm::clamp((v - a) / (b - a), 0.0f, 1.0f);
 }
@@ -197,7 +191,6 @@ static LightingStateComponent getLightingState(Registry& registry) {
 }
 
 static void syncComponentsToGlobals(Registry& registry) {
-    // Synchronize TimeComponent to globals
     auto timeView = registry.view<TimeComponent>();
     if (!timeView.isEmpty()) {
         EntityID timeEntity = *timeView.begin();
@@ -208,7 +201,6 @@ static void syncComponentsToGlobals(Registry& registry) {
         useReducedAmbient = (timeComp.ambientPreset == TimeComponent::AmbientPreset::CRISP);
     }
     
-    // Synchronize LightingStateComponent to globals
     LightingStateComponent lightingComp = getLightingState(registry);
     debugTBN = lightingComp.debugTBN;
     useNormalMap = lightingComp.useNormalMap;
@@ -221,7 +213,7 @@ static void syncComponentsToGlobals(Registry& registry) {
 
 
 static RenderDebugState getRenderDebugState(Registry& registry) {
-    // Read from ECS components if available
+
     auto lightingView = registry.view<LightingStateComponent>();
     auto timeView = registry.view<TimeComponent>();
     
@@ -259,7 +251,7 @@ static RenderDebugState getRenderDebugState(Registry& registry) {
 }
 
 static void applyActiveShaderUniforms(GLuint activeProgramID, Registry& registry) {
-    // Get lighting state from ECS
+
     LightingStateComponent lightingState = getLightingState(registry);
     
     GLint debugLoc = glGetUniformLocation(activeProgramID, "debugTBN");
@@ -382,7 +374,7 @@ int main(int argc, char** argv) {
     // Initialisation du BlockTextureManager
     BlockTextureManager::initialize();
     
-    // === INITIALISATION ImGui ===
+    // Init ImGui ===
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -390,7 +382,7 @@ int main(int argc, char** argv) {
     ImGui::StyleColorsDark();
     ImGui_ImplOpenGL3_Init("#version 150");
     
-    // === INITIALISATION DU MONDE ECS ===
+    // Init ecs
     
     printf("=== ECS Monde Initialization ===\n");
     printf("Initialisation de la Registry ECS...\n");
@@ -466,7 +458,7 @@ int main(int argc, char** argv) {
         glm::vec3(0,0,0)
     });
     registry.addComponent(spectatorCamera, InputReceiverComponent{});
-    registry.addComponent(spectatorCamera, VelocityComponent{ .movementSpeed = 6.f}); //définit la speed camSpec ici si besoin
+    registry.addComponent(spectatorCamera, VelocityComponent{ .movementSpeed = 14.f}); //définit la speed camSpec ici si besoin
 
     //positionCameraForScene(registry, spectatorCamera, selectedScene);
     cameraSystem.initCamera(registry, spectatorCamera, 90, 0, glm::vec3(0,0,0));
@@ -525,7 +517,7 @@ int main(int argc, char** argv) {
     printf("\n=== BOUCLE DE RENDU COMMENCÉE ===\n\n");
 
     bool isLoading = useInfiniteTerrain;
-    const int TARGET_CHUNKS = useInfiniteTerrain ? 9 * 9 : 0; // (Rayon  * 2 + 1)^2 rayon = 14
+    const int TARGET_CHUNKS = useInfiniteTerrain ? 10 * 14 : 0; // (Rayon  * 2 + 1)^2 rayon = 14
 
     unsigned int numThreads = std::thread::hardware_concurrency();
     if (numThreads == 0) numThreads = 4; // Sécurité
@@ -543,7 +535,6 @@ int main(int argc, char** argv) {
         deltaTimeSystem.update(deltaTimeComponent);
         float deltaTime = deltaTimeComponent.deltaTime;
 
-        // Ensure GLFW processes events early so glfwGetKey states are fresh.
         glfwPollEvents();
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -692,8 +683,6 @@ int main(int argc, char** argv) {
         }
 
         glfwSwapBuffers(window);
-        // NOTE: glfwPollEvents() already called at frame start (line 579)
-        // Calling it again here resets key states and breaks checkKeyEdge tracking
 
     } 
     while( (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) && (glfwWindowShouldClose(window) == 0) );

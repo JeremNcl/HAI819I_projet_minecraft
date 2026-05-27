@@ -13,7 +13,7 @@ BlockRenderDefinition makeDefinition(int topSlice, int bottomSlice, int sideSlic
     definition.sideSlice = sideSlice;
     return definition;
 }
-} // namespace
+}
 
 void BlockDefinitionRegistry::initialize() {
     if (g_initialized) return;

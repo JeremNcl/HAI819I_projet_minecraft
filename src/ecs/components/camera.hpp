@@ -7,7 +7,6 @@
 #include <glm/glm.hpp>
 
 struct CameraComponent : public Component {
-    // Look At
     glm::vec3 front = glm::vec3(0.f, 0.f, -1.f);
     glm::vec3 up = glm::vec3(0.f, 1.f, 0.f);
     glm::vec3 right = glm::vec3(1.f, 0.f, 0.f);

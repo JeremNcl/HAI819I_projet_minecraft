@@ -11,7 +11,6 @@
 #include <limits>
 #include <iostream>
 
-// Sparse set storage for a single component type
 class ComponentStorage {
 public:
     virtual ~ComponentStorage() = default;
@@ -34,11 +33,9 @@ public:
     void add(EntityID entity, const T& component) {
         auto it = sparse.find(entity);
         if (it != sparse.end()) {
-            // Already exists, replace
             size_t idx = it->second;
             components[idx] = component;
         } else {
-            // New entity
             size_t idx = dense.size();
             dense.push_back(entity);
             sparse[entity] = idx;
@@ -90,7 +87,6 @@ public:
     bool empty() const { return dense.empty(); }
 };
 
-// Main Registry managing all entities and components
 class Registry {
 private:
     EntityID nextEntity = 1;
@@ -164,7 +160,6 @@ public:
         return storage->get(entity);
     }
 
-    // View for two components - returns iterator-like object
     template <typename T1, typename T2>
     class View2 {
     private:

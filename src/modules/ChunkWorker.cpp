@@ -100,11 +100,7 @@ void ChunkWorker::processTasks() {
                 }
             }
         } else {
-            // SÉCURITÉ : Si le chunk a été chargé depuis le disque, on vérifie que
-            // biomeColors n'est pas vide ou corrompu (ex: tout noir à 0,0,0)
             if (resultTask.chunkData.biomeColors[0] == glm::vec3(0.0f)) {
-                // Optionnel: Si tes textures sont noires/absentes après chargement,
-                // force ici une couleur blanche par défaut pour tester si le problème vient du fichier :
                 resultTask.chunkData.biomeColors.fill(glm::vec3(1.0f));
             }
         }
