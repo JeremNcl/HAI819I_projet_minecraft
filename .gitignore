@@ -2,6 +2,7 @@
 build/
 bin/
 out/
+save/
 
 # Fichiers objets et exécutables compilés
 *.o

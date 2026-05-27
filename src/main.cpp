@@ -81,6 +81,8 @@ bool useHemisphericalAmbient = true;
 bool useBakedAO = true;
 float aoStrength = 0.50f;
 bool useReducedAmbient = false;
+bool useFrustumCulling = true;
+bool useOcclusionCulling;
 
 // Day / Night cycle (managed by DebugInputSystem)
 float dayTime = 0.0f;      // normalized [0,1]

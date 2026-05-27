@@ -17,6 +17,8 @@ extern bool useHemisphericalAmbient;
 extern bool useReducedAmbient;
 extern bool debugWireframe;
 extern float aoStrength;
+extern bool useFrustumCulling;
+extern bool useOcclusionCulling;
 
 bool DebugInputSystem::checkKeyHeld(GLFWwindow* window, int key) {
     int state = glfwGetKey(window, key);
@@ -79,6 +81,18 @@ void DebugInputSystem::update(Registry& registry, GLFWwindow* window, float delt
     for (EntityID entity : receiverView) {
         auto& input = registry.getComponent<InputReceiverComponent>(entity);
         input.toggleCameraSwap = toggleCameraSwap;
+    }
+
+    // FRUSTRUM TOGGLE 
+    if (keyPressedOnce(window, GLFW_KEY_F2, prev_F2)) {
+        useFrustumCulling = !useFrustumCulling;
+        printf("Frustum Culling: %s\n", useFrustumCulling ? "ON" : "OFF");
+    }
+
+    // Occlusion TOGGLE
+    if (keyPressedOnce(window, GLFW_KEY_Y, prev_Y)) {
+        useOcclusionCulling = !useOcclusionCulling;
+        printf("Occlusion Culling (Face-to-Face): %s\n", useOcclusionCulling ? "ON" : "OFF");
     }
 
     // ===== WIREFRAME TOGGLE (F3) =====

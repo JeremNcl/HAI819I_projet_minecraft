@@ -21,7 +21,9 @@ struct InputReceiverComponent : public Component {
     bool toggleNormalMap = false;
     bool toggleDiffuse = false;
     bool toggleAmbient = false;
-    
+    bool toggleFrustumCulling = true;
+    bool toggleOcclusionCulling = true;
+
     bool toggleCameraSwap = false;
     bool toggleMonsterSpawn = false;
 
