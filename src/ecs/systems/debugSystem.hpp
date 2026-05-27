@@ -12,6 +12,7 @@
 #include <GLFW/glfw3.h>
 #include <array>
 #include <iostream>
+#include <iomanip>
 
 struct RenderDebugState {
     bool usePbrShader = true;
@@ -38,6 +39,7 @@ extern float dayTime;
 extern float daySpeed;
 extern bool dayPaused;
 extern bool debugWireframe;
+extern bool startFpsRecording;
 
 class DebugSystem {
     private:
@@ -47,6 +49,11 @@ class DebugSystem {
         float lastDisplayedDeltaTime = 0.016f;
         int frameCount = 0;
         float frameTimeAccum = 0.0f;
+
+        bool isRecording = false;
+        float recordingTimer = 0.0f;
+        std::vector<float> recordedDeltaTimes;
+        void saveFpsLog();
 
     public:
         void update(Registry& _registry, GLFWwindow* _window, float _deltaTime, const RenderDebugState& renderState);

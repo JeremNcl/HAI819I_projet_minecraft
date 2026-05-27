@@ -19,6 +19,7 @@ extern bool useReducedAmbient;
 extern bool debugWireframe;
 extern bool useFrustumCulling;
 extern bool useOcclusionCulling;
+extern bool startFpsRecording;
 
 class DebugInputSystem {
     private:
@@ -37,6 +38,7 @@ class DebugInputSystem {
         bool prev_M = false;
         bool prev_F2 = false;
         bool prev_Y = false;
+        bool prev_G = false;
 
         // Previous key states for debounce detection
         bool prev_UP = false;
