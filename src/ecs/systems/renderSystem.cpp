@@ -16,6 +16,8 @@ struct GLMVec3Hash {
     }
 };
 #endif
+extern bool useFrustumCulling;
+extern bool useOcclusionCulling;
 
 void RenderSystem::extractFrustumPlanes(const glm::mat4& vp, std::array<glm::vec4, 6>& planes) {
     planes[0] = glm::vec4(vp[0][3] + vp[0][0], vp[1][3] + vp[1][0], vp[2][3] + vp[2][0], vp[3][3] + vp[3][0]);
@@ -151,7 +153,7 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::v
         glm::vec3 minBounds = (glm::vec3(current.pos) * 16.0f) + transform.position;
         glm::vec3 maxBounds = minBounds + glm::vec3(16.0f, 16.0f, 16.0f);
         
-        if (!isAABBInFrustum(minBounds, maxBounds, frustumPlanes)) {
+        if (useFrustumCulling && !isAABBInFrustum(minBounds, maxBounds, frustumPlanes)) {
             if (current.pos != startPos) continue; 
         }
 
@@ -161,7 +163,7 @@ void RenderSystem::update(Registry& registry, GLuint shaderProgram, const glm::v
         }
 
         for (int i = 0; i < 6; ++i) {
-            if (current.entryFace != -1 && !subChunk.visibility.isConnected(current.entryFace, i)) {
+            if (useOcclusionCulling && current.entryFace != -1 && !subChunk.visibility.isConnected(current.entryFace, i)) {
                 continue; 
             }
 

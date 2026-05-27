@@ -509,6 +509,8 @@ void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) 
         return type == VoxelType::AIR || type == VoxelType::LEAVES;
     };
 
+    std::vector<int> queue;
+    queue.reserve(4096);
     for (int y = 0; y < 16; ++y) {
         for (int z = 0; z < 16; ++z) {
             for (int x = 0; x < 16; ++x) {
@@ -518,8 +520,6 @@ void ChunkMeshingSystem::computeSubChunkVisibility(SubChunkComponent& subChunk) 
                 // BFS doit pouvoir commencer sur des blocs non opaques OU des feuilles
                 if (visited[index] || isOpaque(type)) continue;
 
-                std::vector<int> queue;
-                queue.reserve(256);
                 queue.push_back(index);
                 visited[index] = true;
 
